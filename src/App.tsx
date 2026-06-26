@@ -272,6 +272,14 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  useEffect(() => {
+    localStorage.setItem("hospitalSchedule", JSON.stringify(schedule));
+  }, [schedule]);
+
+  useEffect(() => {
+    localStorage.setItem("hospitalLogs", JSON.stringify(logs));
+  }, [logs]);
+
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Shift Swaps and Notification States
@@ -1663,28 +1671,24 @@ export default function App() {
 
                   return (
                     <div className="flex flex-col gap-4">
-                      {/* แจ้งเตือนเมื่อมีการแก้ไขและยังไม่ได้บันทึก */}
-                      {isScheduleDirty && (
-                        <div className="bg-amber-500 text-white font-bold p-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md animate-pulse">
-                          <div className="flex items-center gap-2 text-xs sm:text-sm">
-                            <span className="text-lg shrink-0">⚠️</span>
-                            <span>ตรวจพบการเปลี่ยนแปลงตารางเวรที่ยังไม่ได้บันทึก! กรุณากดปุ่ม <strong>"บันทึกข้อมูลตารางเวร"</strong> เพื่อจัดเก็บข้อมูลอย่างถาวร</span>
-                          </div>
-                          <button
-                            onClick={handleSaveSchedule}
-                            className="bg-white text-emerald-900 hover:bg-emerald-50 active:scale-95 font-black text-xs sm:text-sm px-4.5 py-1.5 rounded-xl transition-all shadow-md cursor-pointer shrink-0"
-                          >
-                            💾 บันทึกตารางเวรเลย
-                          </button>
+                      {/* สถานะระบบบันทึกตารางเวรอัตโนมัติ */}
+                      <div className="bg-emerald-50 border border-emerald-150 p-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-800">
+                          <span className="text-base shrink-0">🟢</span>
+                          <span>ระบบบันทึกข้อมูลและอัปเดตตารางเวรทั้งหมดของทุกคนโดยอัตโนมัติในทันทีเมื่อมีการแก้ไข</span>
                         </div>
-                      )}
+                        <div className="bg-white text-emerald-800 border border-emerald-200 font-extrabold text-[10px] sm:text-xs px-3 py-1 rounded-xl flex items-center gap-1.5 shrink-0 shadow-2xs">
+                          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                          <span>เปิดใช้งานระบบบันทึกอัตโนมัติ</span>
+                        </div>
+                      </div>
 
                       {/* แนะนำวิธีใช้งาน */}
                       <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-xl text-xs text-emerald-800 font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-start gap-1.5">
                           <span className="shrink-0">💡</span>
                           <span>
-                            <strong>วิธีการเลือกวันหยุดและวันลาพักร้อนบนปฏิทิน:</strong> คลิกเลือกช่องวันที่ในปฏิทินด้านล่างของคุณ เพื่อปรับเปลี่ยนเป็นวันหยุด (OFF), ลาพักร้อน (VAC) หรือขอขึ้นเวร (WORK) ได้ทันที เมื่อทำการปรับแต่งเรียบร้อยแล้ว <strong>ต้องกดปุ่ม "บันทึกตารางเวร"</strong> ทุกครั้งเพื่ออัปเดตข้อมูลถาวร!
+                            <strong>วิธีการเลือกวันหยุดและวันลาพักร้อนบนปฏิทิน:</strong> คลิกเลือกช่องวันที่ในปฏิทินด้านล่างของคุณ เพื่อสลับปรับเปลี่ยนเป็นวันหยุด (OFF), ลาพักร้อน (VAC) หรือขอขึ้นเวร (WORK) ได้ทันที โดยระบบจะทำการบันทึกข้อมูลและอัปเดตทันทีอัตโนมัติ!
                           </span>
                         </div>
                       </div>
@@ -1698,28 +1702,15 @@ export default function App() {
                               <span>ปฏิทินเวรของ: <strong className="text-emerald-700 underline font-extrabold">คุณ{activeStaff}</strong></span>
                             </h3>
                             <p className="text-gray-400 text-[10px] sm:text-xs">
-                              คลิกช่องวันที่ที่ต้องการเพื่อปรับปรุงเป็นวันหยุด วันลา หรือขอปฏิบัติงาน
+                              คลิกช่องวันที่ที่ต้องการเพื่อปรับปรุงเป็นวันหยุด วันลา หรือขอปฏิบัติงาน (บันทึกอัตโนมัติ)
                             </p>
                           </div>
                           
                           <div className="flex items-center gap-2">
-                            {isScheduleDirty ? (
-                              <button
-                                onClick={handleSaveSchedule}
-                                className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black px-4 py-2 rounded-xl text-xs sm:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-                              >
-                                <span>💾 บันทึกข้อมูลตารางเวร</span>
-                                <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black animate-pulse">รอกดเซฟ</span>
-                              </button>
-                            ) : (
-                              <button
-                                disabled
-                                className="bg-gray-50 text-gray-400 font-semibold px-4 py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 cursor-not-allowed border border-gray-100 shadow-inner"
-                              >
-                                <span>💾 บันทึกตารางเวรแล้ว</span>
-                                <span className="bg-gray-200 text-gray-400 text-[9px] px-1.5 py-0.5 rounded-full font-bold">ล่าสุด</span>
-                              </button>
-                            )}
+                            <div className="bg-emerald-50 border border-emerald-150 text-emerald-800 font-extrabold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5">
+                              <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                              <span>บันทึกอัตโนมัติแล้ว 🟢</span>
+                            </div>
                           </div>
                         </div>
                         <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
@@ -1776,17 +1767,9 @@ export default function App() {
                               <div
                                 key={cell.date}
                                 onClick={() => {
-                                  setQuickReqDate(cell.date);
-                                  // Prepopulate values for quick shift request
-                                  setQuickReqTargetDate("");
-                                  setQuickReqNote("");
-                                  // Default target: find someone else
-                                  const otherStaff = ALL_STAFF.find(s => s !== activeStaff) || "";
-                                  setQuickReqTarget(otherStaff);
+                                  toggleCellState(cell.date, activeStaff);
                                 }}
-                                className={`group/cell relative border rounded-xl p-1.5 sm:p-2 min-h-[70px] sm:min-h-[95px] transition-all flex flex-col justify-between cursor-pointer ${bgClass} ${
-                                  quickReqDate === cell.date ? 'ring-2 ring-emerald-500 shadow-md border-emerald-400' : 'shadow-2xs'
-                                } ${isExcessiveOff ? 'ring-1 ring-red-300' : ''}`}
+                                className={`group/cell relative border rounded-xl p-1.5 sm:p-2 min-h-[70px] sm:min-h-[95px] transition-all flex flex-col justify-between cursor-pointer ${bgClass} shadow-2xs hover:shadow-xs hover:ring-1 hover:ring-emerald-300 ${isExcessiveOff ? 'ring-1 ring-red-300' : ''}`}
                               >
                                 <div className="flex items-center justify-between">
                                   <span className={`text-[10px] sm:text-xs font-black ${isWeekend ? 'text-red-500' : 'text-gray-500'}`}>
@@ -1799,7 +1782,7 @@ export default function App() {
                                     </span>
                                   ) : (
                                     <span className="opacity-0 group-hover/cell:opacity-100 text-[8px] bg-emerald-600 text-white px-1 py-0.2 rounded font-black transition-all">
-                                      ขอเวร ✍️
+                                      เปลี่ยนสถานะ 🔄
                                     </span>
                                   )}
                                 </div>
@@ -1835,160 +1818,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* 📋 แบบฟอร์มขอเวรล่วงหน้าด่วนเมื่อคลิกวัน (Quick Shift Request Overlay Form) */}
-                      <AnimatePresence>
-                        {quickReqDate && (() => {
-                          const formattedDate = new Date(quickReqDate).toLocaleDateString("th-TH", {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric"
-                          });
 
-                          const dayData = schedule[quickReqDate];
-                          const workingG2Count = dayData ? dayData.workingStaff.filter(s => GROUP_2.includes(s)).length : 0;
-                          const offG2Count = 9 - workingG2Count;
-
-                          // Compute projected off count if the request gets approved
-                          let projectedOffG2Count = offG2Count;
-                          const isStaffG2 = GROUP_2.includes(activeStaff);
-                          const isStaffCurrentlyWorking = dayData?.workingStaff.includes(activeStaff);
-                          if (isStaffG2) {
-                            if ((quickReqType === "leave" || quickReqType === "off") && isStaffCurrentlyWorking) {
-                              projectedOffG2Count += 1;
-                            } else if (quickReqType === "work" && !isStaffCurrentlyWorking) {
-                              projectedOffG2Count = Math.max(0, projectedOffG2Count - 1);
-                            }
-                          }
-                          const willBeExcessive = projectedOffG2Count > 4;
-
-                          const handleQuickRequestSubmit = (e: React.FormEvent) => {
-                            e.preventDefault();
-                            
-                            // Direct update to schedule
-                            if (!quickReqDate) return;
-                            let targetStatus: 'WORK' | 'OFF' | 'VAC' = 'OFF';
-                            if (quickReqType === 'leave') targetStatus = 'VAC';
-                            else if (quickReqType === 'work') targetStatus = 'WORK';
-
-                            if (!isAdmin && currentUser !== activeStaff) {
-                              const formattedDate = new Date(quickReqDate).toLocaleDateString("th-TH", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric"
-                              });
-                              if (currentUser) {
-                                showToast(`คุณเข้าระบบเป็น "${currentUser}" สามารถแก้ไขเฉพาะของตนเองได้เท่านั้น ไม่สามารถแก้ไขของ "${activeStaff}" ได้`, false, formattedDate);
-                              } else {
-                                showToast("กรุณาเข้าสู่ระบบด้วยชื่อของคุณก่อนเพื่อเลือกวันหยุด/พักร้อน", false, formattedDate);
-                                setLoginTab("staff");
-                                setSelectedLoginStaff(activeStaff);
-                                setShowAdminModal(true);
-                              }
-                              return;
-                            }
-
-                            setStaffStatus(quickReqDate, activeStaff, targetStatus);
-                            setIsScheduleDirty(true);
-
-                            const readableDate = new Date(quickReqDate).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
-                            let statusText = "ขอลาหยุด (OFF)";
-                            if (targetStatus === 'VAC') statusText = "ขอลาพักร้อน (VAC)";
-                            else if (targetStatus === 'WORK') statusText = "ขอปฏิบัติงาน (WORK)";
-
-                            const reasonStr = quickReqNote.trim() ? ` (${quickReqNote.trim()})` : "";
-
-                            const newNotification: NotificationItem = {
-                              id: `notif-${Date.now()}`,
-                              title: `✍️ ปรับตารางเวรส่วนตัวสำเร็จ 🟢`,
-                              message: `คุณ${activeStaff} ปรับเวรวันที่ ${readableDate} เป็น "${statusText}"${reasonStr} เรียบร้อยแล้ว (กรุณากดปุ่ม บันทึกตารางเวร ทุกครั้งเพื่อให้ระบบบันทึกถาวร)`,
-                              timestamp: new Date().toISOString(),
-                              isRead: false,
-                              type: "info"
-                            };
-
-                            setNotifications(prev => [newNotification, ...prev]);
-                            setQuickReqDate(null);
-                            setQuickReqNote("");
-                            return; // Close quick panel
-                          };
-
-                          return (
-                            <motion.div
-                              initial={{ opacity: 0, y: 15 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -15 }}
-                              className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-4 sm:p-5 shadow-inner mt-2 text-left"
-                            >
-                              <div className="flex items-center justify-between border-b border-emerald-200/40 pb-2 mb-3">
-                                <h4 className="text-xs sm:text-sm font-black text-emerald-900 flex items-center gap-1.5">
-                                  <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-                                  <span>ยื่นคำขอเวรล่วงหน้าด่วน: วันที่ {formattedDate} ({activeStaff})</span>
-                                </h4>
-                                <button
-                                  type="button"
-                                  onClick={() => setQuickReqDate(null)}
-                                  className="text-emerald-700 hover:text-emerald-900 bg-white/50 hover:bg-white/80 p-1 rounded-full transition-all cursor-pointer"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-
-                              <form onSubmit={handleQuickRequestSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end">
-                                
-                                {willBeExcessive && (
-                                  <div className="col-span-1 md:col-span-12 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2.5 text-xs text-red-800 font-medium animate-pulse mb-1">
-                                    <span className="text-base shrink-0">⚠️</span>
-                                    <div>
-                                      <span className="font-bold block text-red-950 mb-0.5">แจ้งเตือน: จำนวนวันหยุดในทีมเกิน 4 คน!</span>
-                                      หากปรับเปลี่ยน จะทำให้มีเจ้าหน้าที่กลุ่มเวรหลักหยุดงานรวมกัน <strong className="text-red-700 underline font-black">{projectedOffG2Count} คน</strong> ในวันนี้ (เกินโควตาที่ให้หยุดได้สูงสุด 4 คนต่อวัน และทำให้เหลือผู้ปฏิบัติงานน้อยกว่า 5 คน)
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Type selector */}
-                                <div className="md:col-span-4">
-                                  <label className="block text-[10px] font-black text-emerald-800 uppercase tracking-wider mb-1">
-                                    เลือกประเภทวันหยุด/เวร
-                                  </label>
-                                  <select
-                                    value={quickReqType}
-                                    onChange={(e) => setQuickReqType(e.target.value as any)}
-                                    className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-bold text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                                  >
-                                    <option value="off">💤 ขอลาหยุด (OFF)</option>
-                                    <option value="leave">🌴 ขอลาพักร้อน (VAC)</option>
-                                    <option value="work">🟢 ขอขึ้นเวร (WORK)</option>
-                                  </select>
-                                </div>
-
-                                {/* Note */}
-                                <div className="md:col-span-5">
-                                  <label className="block text-[10px] font-black text-emerald-800 uppercase tracking-wider mb-1">
-                                    หมายเหตุ / เหตุผลการลา
-                                  </label>
-                                  <input
-                                    type="text"
-                                    placeholder="เช่น ติดธุระครอบครัว, พักผ่อน..."
-                                    value={quickReqNote}
-                                    onChange={(e) => setQuickReqNote(e.target.value)}
-                                    className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                                  />
-                                </div>
-
-                                {/* Actions */}
-                                <div className="md:col-span-3 flex gap-1.5 w-full">
-                                  <button
-                                    type="submit"
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2 px-3 rounded-xl text-xs transition-all shadow-md cursor-pointer text-center flex items-center justify-center gap-1"
-                                  >
-                                    ✅ ตกลง (อัปเดตชั่วคราว)
-                                  </button>
-                                </div>
-                              </form>
-                            </motion.div>
-                          );
-                        })()}
-                      </AnimatePresence>
                     </div>
                   );
                 })()}
