@@ -1,0 +1,8 @@
+{
+  "name": "ShiftFlow - Hospital Edition",
+  "description": "ระบบบริหารจัดการตารางเวร สลับเวรพร้อมระบบสุ่มโค้ดดับเพลิง และระบบแจ้งเตือนสิทธิ์อินชาร์จเอกสารสำหรับแผนกพิมพ์ผล",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
