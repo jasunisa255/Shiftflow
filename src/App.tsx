@@ -1292,6 +1292,12 @@ export default function App() {
             </div>
           </div>
 
+          {/* 📅 วันที่ปัจจุบันบนแถบบนสุด */}
+          <div className="bg-emerald-800/80 border border-emerald-600/55 px-4 py-2 rounded-2xl flex items-center gap-2 shadow-xs text-xs sm:text-sm font-black text-white">
+            <CalendarDays className="w-4 h-4 text-emerald-300 shrink-0" />
+            <span>วันนี้: <span className="text-emerald-100">{new Date().toLocaleDateString("th-TH", { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span></span>
+          </div>
+
           {/* Controls: Notifications & Mode Switcher */}
           <div className="flex items-center gap-3 w-full md:w-auto justify-between sm:justify-start">
             {/* Notification Bell */}
