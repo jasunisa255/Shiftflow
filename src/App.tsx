@@ -2329,11 +2329,11 @@ export default function App() {
                <span className="flex items-center"><span className="flex items-center text-[8px] sm:text-[9px] font-bold text-indigo-700 bg-indigo-100 border border-indigo-200 px-1 rounded mr-1"><PhoneCall className="w-[8px] h-[8px] sm:w-[10px] sm:h-[10px] mr-1" /> 3552</span> ศศลักษณ์/ธนัชพร</span>
             </div>
           </div>
-          <div className="overflow-x-auto flex-1 custom-scrollbar w-full">
+          <div className="overflow-auto max-h-[75vh] flex-1 custom-scrollbar w-full">
             <table className="w-full border-collapse text-sm min-w-max">
               <thead>
                 <tr>
-                  <th className="bg-emerald-600 border-b-2 border-emerald-700 text-white p-2 sm:p-3 font-medium text-left sticky left-0 z-20 min-w-[140px] sm:min-w-[180px] shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
+                  <th className="bg-emerald-600 border-b-2 border-emerald-700 text-white p-2 sm:p-3 font-medium text-left sticky top-0 left-0 z-40 min-w-[140px] sm:min-w-[180px] shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
                     รายชื่อเจ้าหน้าที่ (14 คน)
                   </th>
                   {datesInMonth.map((d) => {
@@ -2345,9 +2345,9 @@ export default function App() {
                     return (
                       <th
                         key={d.date}
-                        className={`p-1 sm:p-[3px] md:p-2 min-w-[40px] sm:min-w-[44px] lg:min-w-[48px] border-l border-emerald-500/20 text-center relative ${
+                        className={`p-1 sm:p-[3px] md:p-2 min-w-[40px] sm:min-w-[44px] lg:min-w-[48px] border-l border-emerald-500/20 text-center relative sticky top-0 z-30 ${
                           d.isWeekend
-                            ? "bg-emerald-700/80 text-white"
+                            ? "bg-emerald-700 text-white"
                             : "bg-emerald-600 text-white"
                         } ${isExcessiveOff ? "ring-2 ring-red-500 ring-inset" : ""}`}
                         title={isExcessiveOff ? `เตือนภัย: วันนี้มีทีมหยุดเกิน 4 คน! (หยุด ${offG2Count} คน จาก 9 คน)` : ""}
