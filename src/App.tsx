@@ -616,7 +616,6 @@ export default function App() {
         month: "short",
         year: "numeric"
       });
-      showToast(`💾 [บันทึกอัตโนมัติ] อัปเดตสถานะของ คุณ${staff} เป็น ${nextState === 'WORK' ? 'ขึ้นเวร' : nextState === 'VAC' ? 'พักร้อน' : 'หยุด'} เรียบร้อยแล้ว`, inChargeTriggered, formattedDate);
       setIsScheduleDirty(false);
 
       return rebalancePhones({
@@ -734,7 +733,6 @@ export default function App() {
         month: "short",
         year: "numeric"
       });
-      showToast(`💾 [บันทึกอัตโนมัติ] อัปเดตสถานะของ คุณ${staff} เป็น ${targetStatus === 'WORK' ? 'ขึ้นเวร' : targetStatus === 'VAC' ? 'พักร้อน' : 'หยุด'} เรียบร้อยแล้ว`, inChargeTriggered, formattedDate);
       setIsScheduleDirty(false);
 
       return rebalancePhones({
