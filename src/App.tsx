@@ -1601,8 +1601,13 @@ export default function App() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">
-                        สรุปและแยกแยะภาระงานรายบุคคล ประจำรอบเวรเดือน {new Date(`${currentMonthStr}-01`).toLocaleDateString("th-TH", { month: 'long', year: 'numeric' })}
+                      <p className="text-xs text-gray-500 mt-1.5 font-bold flex flex-wrap items-center gap-1.5">
+                        <span>📅 รอบเดือนตารางเวร:</span>
+                        <strong className="text-emerald-700 bg-emerald-50 border border-emerald-100/60 px-2 py-0.5 rounded-md text-xs font-black">
+                          {new Date(`${currentMonthStr}-01`).toLocaleDateString("th-TH", { month: 'long', year: 'numeric' })}
+                        </strong>
+                        <span className="text-gray-300 hidden sm:inline">|</span>
+                        <span className="text-gray-400 font-medium">วันที่ปัจจุบัน: {new Date().toLocaleDateString("th-TH", { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                       </p>
                     </div>
                   </div>
@@ -1695,9 +1700,12 @@ export default function App() {
                       <div className="bg-white border border-gray-150 rounded-2xl p-3 sm:p-5 shadow-2xs">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3.5 mb-4">
                           <div>
-                            <h3 className="text-sm sm:text-base font-black text-gray-800 flex items-center gap-1.5">
+                            <h3 className="text-sm sm:text-base font-black text-gray-800 flex flex-wrap items-center gap-1.5">
                               <CalendarDays className="w-5 h-5 text-emerald-600" />
                               <span>ปฏิทินเวรของ: <strong className="text-emerald-700 underline font-extrabold">คุณ{activeStaff}</strong></span>
+                              <span className="bg-emerald-50 text-emerald-800 border border-emerald-150 text-xs px-2 py-0.5 rounded-lg font-extrabold">
+                                ประจำรอบเดือน: {new Date(`${currentMonthStr}-01`).toLocaleDateString("th-TH", { month: 'long', year: 'numeric' })}
+                              </span>
                             </h3>
                             <p className="text-gray-400 text-[10px] sm:text-xs">
                               คลิกช่องวันที่ที่ต้องการเพื่อปรับปรุงเป็นวันหยุด วันลา หรือขอปฏิบัติงาน (บันทึกอัตโนมัติ)
@@ -1764,6 +1772,7 @@ export default function App() {
                             return (
                               <div
                                 key={cell.date}
+                                title={new Date(cell.date).toLocaleDateString("th-TH", { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                 onClick={() => {
                                   toggleCellState(cell.date, activeStaff);
                                 }}
@@ -1824,6 +1833,17 @@ export default function App() {
                 {/* TAB 2: WORKLOAD STATISTICS */}
                 {spotlightTab === "stats" && (
                   <div className="flex flex-col gap-4">
+                    {/* Header showing name and period clearly */}
+                    <div className="bg-emerald-50 border border-emerald-100 p-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-emerald-950">
+                        <TrendingUp className="w-4 h-4 text-emerald-600" />
+                        <span>สถิติภาระงานสะสมของ คุณ{activeStaff}</span>
+                      </div>
+                      <span className="bg-white border border-emerald-200 text-emerald-900 font-black text-xs px-3.5 py-1.5 rounded-xl shadow-xs">
+                        📅 ประจำรอบเดือน: {new Date(`${currentMonthStr}-01`).toLocaleDateString("th-TH", { month: 'long', year: 'numeric' })}
+                      </span>
+                    </div>
+
                     {/* Dashboard stats panel */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                       <div className="bg-emerald-50/50 border border-emerald-100 p-3 rounded-2xl text-center shadow-2xs">
@@ -1952,11 +1972,14 @@ export default function App() {
               <div className="bg-white rounded-2xl shadow-sm border border-emerald-100/60 p-4 sm:p-5 flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                   <div>
-                    <h2 className="text-lg font-bold text-emerald-800 flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-emerald-800 flex flex-wrap items-center gap-2">
                       <CalendarDays className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <span>เจาะลึกตารางรายวัน</span>
+                      <span>เจาะลึกตารางรายวัน:</span>
+                      <span className="bg-emerald-100 text-emerald-950 px-3 py-1 rounded-xl text-xs sm:text-sm font-black border border-emerald-200 shadow-2xs">
+                        {new Date(selectedDate).toLocaleDateString("th-TH", { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                      </span>
                     </h2>
-                    <p className="text-gray-500 text-xs mt-0.5">เลือกวันที่ต้องการดูรายละเอียดและสรุปยอดกำลังพล</p>
+                    <p className="text-gray-500 text-xs mt-1.5">รายละเอียดผู้ปฏิบัติงานและสรุปยอดกำลังพลรายวัน</p>
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
                     <button 
