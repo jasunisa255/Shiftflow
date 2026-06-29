@@ -1,5 +1,5 @@
 {
-  "name": "ShiftFlow - Hospital Edition",
+  "name": "ShiftFlow Medical Checkup Report",
   "description": "ระบบบริหารจัดการตารางเวร สลับเวรพร้อมระบบสุ่มโค้ดดับเพลิง และระบบแจ้งเตือนสิทธิ์อินชาร์จเอกสารสำหรับแผนกพิมพ์ผล",
   "requestFramePermissions": [],
   "majorCapabilities": [

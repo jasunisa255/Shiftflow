@@ -1285,7 +1285,7 @@ export default function App() {
               <Stethoscope className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-wide">ShiftFlow</h1>
+              <h1 className="text-xl font-bold tracking-wide">ShiftFlow Medical Checkup Report</h1>
               <p className="text-emerald-100 text-xs mt-0.5">
                 ระบบบริหารจัดการตารางเวรและแจ้งเตือน แผนกพิมพ์ผล
               </p>
