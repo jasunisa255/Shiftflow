@@ -177,8 +177,8 @@ function rebalancePhones(schedule: Record<string, DaySchedule>): Record<string, 
 function getInitialSchedule(year: number, month: number) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const schedule: Record<string, DaySchedule> = {};
+  const dates: string[] = [];
 
-  let docIndex = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(year, month, d);
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
@@ -191,17 +191,92 @@ function getInitialSchedule(year: number, month: number) {
       workingStaff = [...workingStaff, ...GROUP_1];
     }
 
-    const docInCharge = GROUP_2[docIndex % GROUP_2.length];
-    docIndex++;
-
+    dates.push(dateStr);
     schedule[dateStr] = {
       date: dateStr,
       workingStaff,
       fireCodes: assignFireCodes(workingStaff),
       vacationStaff: [],
-      docInCharge,
+      docInCharge: null,
     };
   }
+
+  // Find previous month last day's doc from localStorage if it exists
+  let prevDoc: string | null = null;
+  try {
+    const saved = localStorage.getItem("hospitalSchedule");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const prevDateObj = new Date(year, month, 1);
+      prevDateObj.setDate(prevDateObj.getDate() - 1);
+      const prevDateStr = `${prevDateObj.getFullYear()}-${String(prevDateObj.getMonth() + 1).padStart(2, '0')}-${String(prevDateObj.getDate()).padStart(2, '0')}`;
+      prevDoc = parsed[prevDateStr]?.docInCharge || null;
+    }
+  } catch (e) {
+    // Ignore error
+  }
+
+  // Perfect Doc assignment solver for initial schedule
+  const result: Record<string, string> = {};
+  const N = dates.length;
+  const maxAllowed = Math.ceil(N / GROUP_2.length);
+  const counts: Record<string, number> = {};
+
+  function backtrack(index: number, currentMaxAllowed: number): boolean {
+    if (index === N) {
+      return true;
+    }
+    const date = dates[index];
+    const available = GROUP_2;
+
+    const candidates = [...available].sort((a, b) => counts[a] - counts[b]);
+
+    for (const candidate of candidates) {
+      if (index > 0) {
+        if (result[dates[index - 1]] === candidate) continue;
+      } else {
+        if (prevDoc === candidate) continue;
+      }
+
+      if (counts[candidate] >= currentMaxAllowed) {
+        continue;
+      }
+
+      result[date] = candidate;
+      counts[candidate]++;
+
+      if (backtrack(index + 1, currentMaxAllowed)) {
+        return true;
+      }
+
+      counts[candidate]--;
+      result[date] = "";
+    }
+
+    return false;
+  }
+
+  let solved = false;
+  for (let limit = maxAllowed; limit <= N; limit++) {
+    GROUP_2.forEach(p => counts[p] = 0);
+    if (backtrack(0, limit)) {
+      solved = true;
+      break;
+    }
+  }
+
+  if (!solved) {
+    let docIndex = 0;
+    dates.forEach(date => {
+      schedule[date].docInCharge = GROUP_2[docIndex % GROUP_2.length];
+      docIndex++;
+    });
+  } else {
+    dates.forEach(date => {
+      schedule[date].docInCharge = result[date];
+    });
+  }
+
   return rebalancePhones(schedule);
 }
 
@@ -1156,6 +1231,117 @@ export default function App() {
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 8000);
+  };
+
+  const handleAutoScheduleDoc = () => {
+    if (!isAdmin) {
+      showToast("เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถจัดเวร Doc อัตโนมัติได้", false, new Date().toLocaleDateString("th-TH"));
+      return;
+    }
+
+    setSchedule(prev => {
+      const dates = datesInMonth.map(d => d.date);
+      if (dates.length === 0) return prev;
+
+      const availableDocsPerDate: Record<string, string[]> = {};
+      dates.forEach(date => {
+        const day = prev[date];
+        if (day) {
+          availableDocsPerDate[date] = day.workingStaff.filter(s => GROUP_2.includes(s));
+        } else {
+          availableDocsPerDate[date] = [];
+        }
+      });
+
+      // Get previous month's last day Doc to prevent consecutive assignments across months
+      const prevDateObj = new Date(dates[0]);
+      prevDateObj.setDate(prevDateObj.getDate() - 1);
+      const prevDateStr = `${prevDateObj.getFullYear()}-${String(prevDateObj.getMonth() + 1).padStart(2, '0')}-${String(prevDateObj.getDate()).padStart(2, '0')}`;
+      const prevDoc = prev[prevDateStr]?.docInCharge || null;
+
+      const result: Record<string, string> = {};
+      const N = dates.length;
+      
+      const maxAllowed = Math.ceil(N / GROUP_2.length);
+      const counts: Record<string, number> = {};
+      GROUP_2.forEach(p => counts[p] = 0);
+
+      function backtrack(index: number, currentMaxAllowed: number): boolean {
+        if (index === N) {
+          return true;
+        }
+        const date = dates[index];
+        const available = availableDocsPerDate[date] || [];
+        if (available.length === 0) {
+          result[date] = "";
+          return backtrack(index + 1, currentMaxAllowed);
+        }
+
+        const candidates = [...available].sort((a, b) => counts[a] - counts[b]);
+
+        for (const candidate of candidates) {
+          if (index > 0) {
+            if (result[dates[index - 1]] === candidate) continue;
+          } else {
+            if (prevDoc === candidate) continue;
+          }
+
+          if (counts[candidate] >= currentMaxAllowed) {
+            continue;
+          }
+
+          result[date] = candidate;
+          counts[candidate]++;
+
+          if (backtrack(index + 1, currentMaxAllowed)) {
+            return true;
+          }
+
+          counts[candidate]--;
+          result[date] = "";
+        }
+
+        return false;
+      }
+
+      let solved = false;
+      for (let limit = maxAllowed; limit <= N; limit++) {
+        GROUP_2.forEach(p => counts[p] = 0);
+        if (backtrack(0, limit)) {
+          solved = true;
+          break;
+        }
+      }
+
+      if (!solved) {
+        showToast("❌ ไม่สามารถจัดเวร Doc อัตโนมัติให้เงื่อนไขสมบูรณ์ได้เนื่องจากข้อจำกัดวันหยุด", false, new Date().toLocaleDateString("th-TH"));
+        return prev;
+      }
+
+      const newSchedule = { ...prev };
+      dates.forEach(date => {
+        if (newSchedule[date]) {
+          newSchedule[date] = {
+            ...newSchedule[date],
+            docInCharge: result[date] || null
+          };
+        }
+      });
+
+      showToast("✨ จัดตารางเวร Doc อัตโนมัติเสร็จสิ้น! ทุกคนได้รับมอบหมายอย่างเท่าเทียมและไม่มีเวรต่อกัน", false, new Date().toLocaleDateString("th-TH"));
+
+      const logEntry: LogEntry = {
+        id: Date.now(),
+        date: dates[0],
+        timestamp: new Date().toISOString(),
+        personOut: "ระบบจัดเวร",
+        personIn: "จัดเวร Doc อัตโนมัติ",
+        inChargeTriggered: false,
+      };
+      setLogs(l => [logEntry, ...l].slice(0, 100));
+
+      return rebalancePhones(newSchedule);
+    });
   };
 
   const handleExportExcel = () => {
@@ -2483,10 +2669,22 @@ export default function App() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <section className="bg-white rounded-2xl shadow-sm border border-indigo-100/60 p-4 sm:p-5 shrink-0 flex-1">
-            <h2 className="text-base sm:text-lg font-semibold text-indigo-800 flex items-center mb-3 sm:mb-4">
-               <FileText className="w-5 h-5 mr-1.5 sm:mr-2 text-indigo-600 shrink-0" />
-               <span>สรุปจำนวนหน้าที่ In-charge เอกสาร (Doc.)</span>
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-indigo-50 pb-3">
+              <h2 className="text-base sm:text-lg font-bold text-indigo-800 flex items-center">
+                 <FileText className="w-5 h-5 mr-1.5 sm:mr-2 text-indigo-600 shrink-0" />
+                 <span>สรุปจำนวนหน้าที่ In-charge เอกสาร (Doc.)</span>
+              </h2>
+              {isAdmin && (
+                <button
+                  onClick={handleAutoScheduleDoc}
+                  className="flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-black bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white px-3.5 py-2 rounded-xl transition-all shadow-xs cursor-pointer select-none"
+                  title="จัดตารางเวร Doc ทั้งเดือนโดยเฉลี่ยจำนวนวันเท่าเทียมกันและไม่มีใครได้เวรติดกัน"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
+                  <span>จัดเวร Doc อัตโนมัติ</span>
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                {GROUP_2.map(staff => {
                   const docCount = datesInMonth.filter((d: any) => schedule[d.date]?.docInCharge === staff).length;
