@@ -174,6 +174,93 @@ function rebalancePhones(schedule: Record<string, DaySchedule>): Record<string, 
   return newSchedule;
 }
 
+function solveDocAssignments(
+  dates: string[],
+  availableDocsPerDate: Record<string, string[]>,
+  prevDoc: string | null
+): Record<string, string> | null {
+  const N = dates.length;
+  const M = dates.filter(date => (availableDocsPerDate[date] || []).length > 0).length;
+  if (M === 0) {
+    const emptyResult: Record<string, string> = {};
+    dates.forEach(d => emptyResult[d] = "");
+    return emptyResult;
+  }
+
+  const idealMin = Math.floor(M / GROUP_2.length);
+  const idealMax = Math.ceil(M / GROUP_2.length);
+
+  // We define search limits of [minAllowed, maxAllowed] in order of preference (fairest first)
+  const searchLimits: { minAllowed: number; maxAllowed: number }[] = [
+    { minAllowed: idealMin, maxAllowed: idealMax },
+    { minAllowed: Math.max(0, idealMin - 1), maxAllowed: idealMax + 1 },
+    { minAllowed: Math.max(0, idealMin - 2), maxAllowed: idealMax + 2 },
+    { minAllowed: 0, maxAllowed: N } // ultimate fallback
+  ];
+
+  for (const { minAllowed, maxAllowed } of searchLimits) {
+    const result: Record<string, string> = {};
+    const counts: Record<string, number> = {};
+    GROUP_2.forEach(p => counts[p] = 0);
+
+    function backtrack(index: number): boolean {
+      if (index === N) {
+        // Enforce the lower bound for all candidates, taking into account their maximum possible availability
+        for (const p of GROUP_2) {
+          const maxPossible = dates.filter(d => (availableDocsPerDate[d] || []).includes(p)).length;
+          const targetMin = Math.min(minAllowed, maxPossible);
+          if (counts[p] < targetMin) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      const date = dates[index];
+      const available = availableDocsPerDate[date] || [];
+      if (available.length === 0) {
+        result[date] = "";
+        return backtrack(index + 1);
+      }
+
+      // Sort candidates by current assignment counts so we try the least-assigned first
+      const candidates = [...available].sort((a, b) => counts[a] - counts[b]);
+
+      for (const candidate of candidates) {
+        // Prevent consecutive assignments
+        if (index > 0) {
+          if (result[dates[index - 1]] === candidate) continue;
+        } else {
+          if (prevDoc === candidate) continue;
+        }
+
+        // Prevent exceeding the maxAllowed for this search round
+        if (counts[candidate] >= maxAllowed) {
+          continue;
+        }
+
+        result[date] = candidate;
+        counts[candidate]++;
+
+        if (backtrack(index + 1)) {
+          return true;
+        }
+
+        counts[candidate]--;
+        result[date] = "";
+      }
+
+      return false;
+    }
+
+    if (backtrack(0)) {
+      return result;
+    }
+  }
+
+  return null;
+}
+
 function getInitialSchedule(year: number, month: number) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const schedule: Record<string, DaySchedule> = {};
@@ -217,55 +304,14 @@ function getInitialSchedule(year: number, month: number) {
   }
 
   // Perfect Doc assignment solver for initial schedule
-  const result: Record<string, string> = {};
-  const N = dates.length;
-  const maxAllowed = Math.ceil(N / GROUP_2.length);
-  const counts: Record<string, number> = {};
+  const availableDocsPerDate: Record<string, string[]> = {};
+  dates.forEach(date => {
+    availableDocsPerDate[date] = [...GROUP_2];
+  });
 
-  function backtrack(index: number, currentMaxAllowed: number): boolean {
-    if (index === N) {
-      return true;
-    }
-    const date = dates[index];
-    const available = GROUP_2;
+  const result = solveDocAssignments(dates, availableDocsPerDate, prevDoc);
 
-    const candidates = [...available].sort((a, b) => counts[a] - counts[b]);
-
-    for (const candidate of candidates) {
-      if (index > 0) {
-        if (result[dates[index - 1]] === candidate) continue;
-      } else {
-        if (prevDoc === candidate) continue;
-      }
-
-      if (counts[candidate] >= currentMaxAllowed) {
-        continue;
-      }
-
-      result[date] = candidate;
-      counts[candidate]++;
-
-      if (backtrack(index + 1, currentMaxAllowed)) {
-        return true;
-      }
-
-      counts[candidate]--;
-      result[date] = "";
-    }
-
-    return false;
-  }
-
-  let solved = false;
-  for (let limit = maxAllowed; limit <= N; limit++) {
-    GROUP_2.forEach(p => counts[p] = 0);
-    if (backtrack(0, limit)) {
-      solved = true;
-      break;
-    }
-  }
-
-  if (!solved) {
+  if (!result) {
     let docIndex = 0;
     dates.forEach(date => {
       schedule[date].docInCharge = GROUP_2[docIndex % GROUP_2.length];
@@ -273,7 +319,7 @@ function getInitialSchedule(year: number, month: number) {
     });
   } else {
     dates.forEach(date => {
-      schedule[date].docInCharge = result[date];
+      schedule[date].docInCharge = result[date] || null;
     });
   }
 
@@ -1259,61 +1305,9 @@ export default function App() {
       const prevDateStr = `${prevDateObj.getFullYear()}-${String(prevDateObj.getMonth() + 1).padStart(2, '0')}-${String(prevDateObj.getDate()).padStart(2, '0')}`;
       const prevDoc = prev[prevDateStr]?.docInCharge || null;
 
-      const result: Record<string, string> = {};
-      const N = dates.length;
-      
-      const maxAllowed = Math.ceil(N / GROUP_2.length);
-      const counts: Record<string, number> = {};
-      GROUP_2.forEach(p => counts[p] = 0);
+      const result = solveDocAssignments(dates, availableDocsPerDate, prevDoc);
 
-      function backtrack(index: number, currentMaxAllowed: number): boolean {
-        if (index === N) {
-          return true;
-        }
-        const date = dates[index];
-        const available = availableDocsPerDate[date] || [];
-        if (available.length === 0) {
-          result[date] = "";
-          return backtrack(index + 1, currentMaxAllowed);
-        }
-
-        const candidates = [...available].sort((a, b) => counts[a] - counts[b]);
-
-        for (const candidate of candidates) {
-          if (index > 0) {
-            if (result[dates[index - 1]] === candidate) continue;
-          } else {
-            if (prevDoc === candidate) continue;
-          }
-
-          if (counts[candidate] >= currentMaxAllowed) {
-            continue;
-          }
-
-          result[date] = candidate;
-          counts[candidate]++;
-
-          if (backtrack(index + 1, currentMaxAllowed)) {
-            return true;
-          }
-
-          counts[candidate]--;
-          result[date] = "";
-        }
-
-        return false;
-      }
-
-      let solved = false;
-      for (let limit = maxAllowed; limit <= N; limit++) {
-        GROUP_2.forEach(p => counts[p] = 0);
-        if (backtrack(0, limit)) {
-          solved = true;
-          break;
-        }
-      }
-
-      if (!solved) {
+      if (!result) {
         showToast("❌ ไม่สามารถจัดเวร Doc อัตโนมัติให้เงื่อนไขสมบูรณ์ได้เนื่องจากข้อจำกัดวันหยุด", false, new Date().toLocaleDateString("th-TH"));
         return prev;
       }
