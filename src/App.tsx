@@ -616,8 +616,8 @@ export default function App() {
         month: "short",
         year: "numeric"
       });
-      showToast(`อัปเดตสถานะของ ${staff} เป็น ${nextState === 'WORK' ? 'ขึ้นเวร' : nextState === 'VAC' ? 'พักร้อน' : 'หยุด'}`, inChargeTriggered, formattedDate);
-      setIsScheduleDirty(true);
+      showToast(`💾 [บันทึกอัตโนมัติ] อัปเดตสถานะของ คุณ${staff} เป็น ${nextState === 'WORK' ? 'ขึ้นเวร' : nextState === 'VAC' ? 'พักร้อน' : 'หยุด'} เรียบร้อยแล้ว`, inChargeTriggered, formattedDate);
+      setIsScheduleDirty(false);
 
       return rebalancePhones({
         ...prev,
@@ -734,8 +734,8 @@ export default function App() {
         month: "short",
         year: "numeric"
       });
-      showToast(`อัปเดตสถานะของ ${staff} เป็น ${targetStatus === 'WORK' ? 'ขึ้นเวร' : targetStatus === 'VAC' ? 'พักร้อน' : 'หยุด'}`, inChargeTriggered, formattedDate);
-      setIsScheduleDirty(true);
+      showToast(`💾 [บันทึกอัตโนมัติ] อัปเดตสถานะของ คุณ${staff} เป็น ${targetStatus === 'WORK' ? 'ขึ้นเวร' : targetStatus === 'VAC' ? 'พักร้อน' : 'หยุด'} เรียบร้อยแล้ว`, inChargeTriggered, formattedDate);
+      setIsScheduleDirty(false);
 
       return rebalancePhones({
         ...prev,
@@ -813,7 +813,7 @@ export default function App() {
     setReqNote("");
 
     // Success Toast
-    showToast(`ส่งคำขอแล้ว และระบบได้แจ้งเตือนไปยังเจ้าหน้าที่ทุกคนในแผนกแล้ว`, false, reqDate);
+    showToast(`💾 [บันทึกอัตโนมัติ] ส่งคำขอแล้ว และระบบได้บันทึกข้อมูลเรียบร้อยแล้ว`, false, reqDate);
   };
 
   // Approve a shift request and apply mutations to the schedule
@@ -1078,7 +1078,7 @@ export default function App() {
     setNotifications(prev => [successNotification, ...prev]);
 
     // Success Toast
-    showToast("อนุมัติคำขอเปลี่ยนเวรและอัปเดตปฏิทินเรียบร้อยแล้ว", false, req.date);
+    showToast("💾 [บันทึกอัตโนมัติ] อนุมัติคำขอเปลี่ยนเวรและอัปเดตปฏิทินเรียบร้อยแล้ว", false, req.date);
   };
 
   // Reject a shift request
@@ -1096,13 +1096,13 @@ export default function App() {
     };
 
     setNotifications(prev => [rejectNotification, ...prev]);
-    showToast(`ปฏิเสธคำขอเปลี่ยนเวรของ ${requesterName} เรียบร้อยแล้ว`, false, dateStr);
+    showToast(`💾 [บันทึกอัตโนมัติ] ปฏิเสธคำขอเปลี่ยนเวรของ คุณ${requesterName} เรียบร้อยแล้ว`, false, dateStr);
   };
 
   // Delete/Cancel a request
   const handleDeleteShiftRequest = (reqId: string) => {
     setShiftRequests(prev => prev.filter(r => r.id !== reqId));
-    showToast("ลบคำขอเปลี่ยนเวรออกจากรายการแล้ว", false, selectedDate);
+    showToast("💾 [บันทึกอัตโนมัติ] ลบคำขอเปลี่ยนเวรออกจากรายการแล้ว", false, selectedDate);
   };
 
   const handlePrevDay = () => {
@@ -1272,7 +1272,7 @@ export default function App() {
       }
       
       setSchedule(newSchedule);
-      showToast("นำเข้าตารางเวรจาก Excel สำเร็จ", false, new Date().toLocaleDateString("th-TH"));
+      showToast("💾 [บันทึกอัตโนมัติ] นำเข้าตารางเวรจาก Excel สำเร็จและบันทึกข้อมูลเรียบร้อยแล้ว", false, new Date().toLocaleDateString("th-TH"));
     };
     reader.readAsBinaryString(file);
     e.target.value = '';
