@@ -270,10 +270,23 @@ function solveDocAssignments(
   return null;
 }
 
-function getInitialSchedule(year: number, month: number) {
+function getInitialSchedule(year: number, month: number, customHolidays?: Holiday[]) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const schedule: Record<string, DaySchedule> = {};
   const dates: string[] = [];
+
+  let activeHolidays = customHolidays;
+  if (!activeHolidays) {
+    const saved = localStorage.getItem("hospitalSchedule_holidays");
+    if (saved) {
+      try {
+        activeHolidays = JSON.parse(saved);
+      } catch (e) {}
+    }
+  }
+  if (!activeHolidays) {
+    activeHolidays = [];
+  }
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(year, month, d);
@@ -281,9 +294,10 @@ function getInitialSchedule(year: number, month: number) {
       d
     ).padStart(2, "0")}`;
     const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+    const hasHoliday = activeHolidays.some(h => h.date === dateStr);
 
     let workingStaff = [...GROUP_2];
-    if (!isWeekend) {
+    if (!isWeekend && !hasHoliday) {
       workingStaff = [...workingStaff, ...GROUP_1];
     }
 
@@ -372,6 +386,16 @@ export default function App() {
   const [passwordError, setPasswordError] = useState("");
   const [isScheduleDirty, setIsScheduleDirty] = useState<boolean>(false);
 
+  // States for Annual Vacation Tracker and Quota
+  const [vacationTrackerYear, setVacationTrackerYear] = useState<number>(() => {
+    const today = new Date();
+    return today.getFullYear();
+  });
+  const [expandedVacationStaff, setExpandedVacationStaff] = useState<string | null>(null);
+  const [quickVacStaff, setQuickVacStaff] = useState<string>(ALL_STAFF[0]);
+  const [quickVacDate, setQuickVacDate] = useState<string>("");
+
+
   const [holidays, setHolidays] = useState<Holiday[]>(() => {
     const saved = localStorage.getItem("hospitalSchedule_holidays");
     if (saved) {
@@ -430,7 +454,7 @@ export default function App() {
         // Fallback below
       }
     }
-    return getInitialSchedule(currentNow.getFullYear(), currentNow.getMonth());
+    return getInitialSchedule(currentNow.getFullYear(), currentNow.getMonth(), holidays);
   });
 
   const [logs, setLogs] = useState<LogEntry[]>(() => {
@@ -581,7 +605,7 @@ export default function App() {
     const testDateStr = `${yearStr}-${monthStr}-01`;
     setSchedule(prev => {
       if (!prev[testDateStr]) {
-        const newMonth = getInitialSchedule(year, month);
+        const newMonth = getInitialSchedule(year, month, holidays);
         return { ...prev, ...newMonth };
       }
       return prev;
@@ -1349,11 +1373,186 @@ export default function App() {
     };
 
     setHolidays(prev => [...prev, newH].sort((a, b) => a.date.localeCompare(b.date)));
+    
+    // Automatically update the schedule to remove GROUP_1 from working staff on this new holiday
+    setSchedule(prev => {
+      const day = prev[newHolidayDate];
+      if (!day) return prev;
+      
+      const newWorking = day.workingStaff.filter(s => !GROUP_1.includes(s));
+      
+      return rebalancePhones({
+        ...prev,
+        [newHolidayDate]: {
+          ...day,
+          workingStaff: newWorking,
+          fireCodes: assignFireCodes(newWorking),
+        }
+      });
+    });
+
     showToast(`✨ เพิ่มวันหยุด "${newH.name}" เรียบร้อยแล้ว`, false, new Date().toLocaleDateString("th-TH"));
     
     // Clear form
     setNewHolidayDate("");
     setNewHolidayName("");
+  };
+
+  const getStaffVacationDatesForYear = (staffName: string, year: number) => {
+    const dates: { date: string; dateObj: Date }[] = [];
+    Object.keys(schedule).forEach(dateKey => {
+      if (dateKey.startsWith(`${year}-`)) {
+        const day = schedule[dateKey];
+        if (day.vacationStaff?.includes(staffName)) {
+          dates.push({ date: dateKey, dateObj: new Date(dateKey) });
+        }
+      }
+    });
+    return dates.sort((a, b) => a.date.localeCompare(b.date));
+  };
+
+  const handleQuickVacationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAdmin) {
+      showToast("เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถบันทึกวันลาพักร้อนด่วนได้", false, new Date().toLocaleDateString("th-TH"));
+      return;
+    }
+    if (!quickVacDate || !quickVacStaff) {
+      showToast("กรุณากรอกข้อมูลวันที่และรายชื่อให้ครบถ้วน", false, new Date().toLocaleDateString("th-TH"));
+      return;
+    }
+    
+    const dateKey = quickVacDate;
+    const [yStr, mStr] = dateKey.split('-');
+    const year = parseInt(yStr);
+    const month = parseInt(mStr) - 1;
+    
+    setSchedule(prev => {
+      let updated = { ...prev };
+      const testDateStr = `${yStr}-${mStr}-01`;
+      if (!updated[testDateStr]) {
+        const newMonth = getInitialSchedule(year, month, holidays);
+        updated = { ...updated, ...newMonth };
+      }
+      
+      const day = updated[dateKey];
+      if (!day) return prev;
+      
+      let newWorking = [...day.workingStaff];
+      let newVac = [...(day.vacationStaff || [])];
+      
+      if (!newVac.includes(quickVacStaff)) {
+        newVac.push(quickVacStaff);
+      }
+      newWorking = newWorking.filter(s => s !== quickVacStaff);
+      
+      let newDoc = day.docInCharge;
+      if (quickVacStaff === day.docInCharge) {
+        const docCounts: Record<string, number> = {};
+        Object.keys(updated).forEach(dKey => {
+          if (dKey !== dateKey) {
+            const doc = updated[dKey].docInCharge;
+            if (doc) docCounts[doc] = (docCounts[doc] || 0) + 1;
+          }
+        });
+        const availableDocs = newWorking.filter(s => GROUP_2.includes(s));
+        if (availableDocs.length > 0) {
+          availableDocs.sort((a, b) => (docCounts[a] || 0) - (docCounts[b] || 0));
+          newDoc = availableDocs[0];
+        } else {
+          newDoc = null;
+        }
+      }
+      
+      const logEntry: LogEntry = {
+        id: Date.now(),
+        date: dateKey,
+        timestamp: new Date().toISOString(),
+        personOut: quickVacStaff,
+        personIn: 'พักร้อน (บันทึกด่วน)',
+        inChargeTriggered: false,
+      };
+      setLogs(l => [logEntry, ...l].slice(0, 100));
+      
+      const readableDate = new Date(dateKey).toLocaleDateString("th-TH", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+      showToast(`🎉 บันทึกการพักร้อนสำหรับ คุณ${quickVacStaff} วันที่ ${readableDate} สำเร็จ`, false, readableDate);
+      
+      return rebalancePhones({
+        ...updated,
+        [dateKey]: {
+          ...day,
+          workingStaff: newWorking,
+          vacationStaff: newVac,
+          fireCodes: assignFireCodes(newWorking),
+          docInCharge: newDoc
+        }
+      });
+    });
+    
+    setQuickVacDate("");
+  };
+
+  const handleRemoveVacation = (dateKey: string, staff: string) => {
+    if (!isAdmin) {
+      showToast("เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถยกเลิกวันลาพักร้อนได้", false, new Date().toLocaleDateString("th-TH"));
+      return;
+    }
+    
+    setSchedule(prev => {
+      const day = prev[dateKey];
+      if (!day) return prev;
+      
+      let newWorking = [...day.workingStaff];
+      let newVac = [...(day.vacationStaff || [])];
+      
+      newVac = newVac.filter(s => s !== staff);
+      
+      const dObj = new Date(dateKey);
+      const isWeekend = dObj.getDay() === 0 || dObj.getDay() === 6;
+      const hasHoliday = holidays.some(h => h.date === dateKey);
+      const shouldBeWorking = GROUP_2.includes(staff) || (!isWeekend && !hasHoliday && GROUP_1.includes(staff));
+      
+      if (shouldBeWorking && !newWorking.includes(staff)) {
+        newWorking.push(staff);
+      }
+      
+      let newDoc = day.docInCharge;
+      if (!newDoc && shouldBeWorking && GROUP_2.includes(staff)) {
+        newDoc = staff;
+      }
+      
+      const logEntry: LogEntry = {
+        id: Date.now(),
+        date: dateKey,
+        timestamp: new Date().toISOString(),
+        personOut: staff,
+        personIn: 'ยกเลิกพักร้อน',
+        inChargeTriggered: false,
+      };
+      setLogs(l => [logEntry, ...l].slice(0, 100));
+      
+      const readableDate = new Date(dateKey).toLocaleDateString("th-TH", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+      showToast(`🗑️ ยกเลิกวันลาพักร้อนของ คุณ${staff} วันที่ ${readableDate} เรียบร้อยแล้ว`, false, readableDate);
+      
+      return rebalancePhones({
+        ...prev,
+        [dateKey]: {
+          ...day,
+          workingStaff: newWorking,
+          vacationStaff: newVac,
+          fireCodes: assignFireCodes(newWorking),
+          docInCharge: newDoc
+        }
+      });
+    });
   };
 
   const handleAutoScheduleDoc = () => {
@@ -1862,7 +2061,7 @@ export default function App() {
                     if (hasHoliday.type === "public") {
                       tapeClass = "bg-amber-100/70 hover:bg-amber-200 text-amber-800 border border-amber-200";
                     } else {
-                      tapeClass = "bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200";
+                      tapeClass = "bg-orange-50 hover:bg-orange-100 text-orange-850 border border-orange-200";
                     }
                   } else if (d.isWeekend) {
                     tapeClass = "bg-gray-100/70 hover:bg-gray-200/80 text-gray-700 border border-gray-200/60";
@@ -1999,7 +2198,7 @@ export default function App() {
                           if (hasHoliday.type === "public") {
                             headerBg = "bg-amber-500 text-white";
                           } else {
-                            headerBg = "bg-rose-500 text-white";
+                            headerBg = "bg-orange-500 text-white";
                           }
                         }
 
@@ -2109,7 +2308,7 @@ export default function App() {
                                 // Background column indicator highlights
                                 let cellBg = "";
                                 if (d.holiday) {
-                                  cellBg = d.holiday.type === "public" ? "bg-amber-50/40" : "bg-rose-50/30";
+                                  cellBg = d.holiday.type === "public" ? "bg-amber-50/40" : "bg-orange-50/45";
                                 } else if (d.obj.getDay() === 6) { // Sat columns
                                   cellBg = "bg-purple-50/15";
                                 } else if (d.obj.getDay() === 0) { // Sun columns
@@ -2408,7 +2607,7 @@ export default function App() {
                             bgClass = "bg-orange-50 hover:bg-orange-100/80 text-orange-950 border border-orange-200 font-bold";
                             dotClass = "bg-orange-500";
                           } else if (hasHoliday) {
-                            bgClass = hasHoliday.type === "public" ? "bg-amber-50 hover:bg-amber-100/60 border border-amber-200 text-amber-900" : "bg-rose-50 hover:bg-rose-100/60 border border-rose-200 text-rose-900";
+                            bgClass = hasHoliday.type === "public" ? "bg-amber-50 hover:bg-amber-100/60 border border-amber-200 text-amber-900" : "bg-orange-50 hover:bg-orange-100/60 border border-orange-200 text-orange-950";
                           }
 
                           return (
@@ -2728,7 +2927,7 @@ export default function App() {
                               <div
                                 key={d.date}
                                 className={`p-2.5 rounded-xl border flex flex-col gap-0.5 text-left ${
-                                  h.type === "public" ? "bg-amber-50/40 border-amber-100 text-amber-900" : "bg-rose-50/40 border-rose-100 text-rose-900"
+                                  h.type === "public" ? "bg-amber-50/40 border-amber-100 text-amber-900" : "bg-orange-50/40 border-orange-100 text-orange-950"
                                 }`}
                               >
                                 <span className="text-[8px] font-black uppercase opacity-75">วันที่ {d.dateNum} ({d.dayName})</span>
@@ -3071,9 +3270,9 @@ export default function App() {
                                 statusLabel = "วันหยุดนักขัตฤกษ์ 🎉";
                                 statusColor = "text-amber-700 font-bold";
                               } else {
-                                bgClass = "bg-rose-50/50 border-rose-200 text-rose-950 hover:bg-rose-100/50 hover:border-rose-300";
+                                bgClass = "bg-orange-50/50 border-orange-200 text-orange-950 hover:bg-orange-100/50 hover:border-orange-300";
                                 statusLabel = "วันหยุดบริษัท 🏢";
-                                statusColor = "text-rose-700 font-bold";
+                                statusColor = "text-orange-700 font-bold";
                               }
                             }
 
@@ -3114,7 +3313,7 @@ export default function App() {
                                     <span className={`text-[8px] font-extrabold px-1 py-0.5 rounded-sm leading-tight max-w-full truncate block mt-0.5 ${
                                       hasHoliday.type === "public"
                                         ? "bg-amber-100 text-amber-800 border border-amber-200"
-                                        : "bg-rose-100 text-rose-800 border border-rose-200"
+                                        : "bg-orange-100 text-orange-800 border border-orange-200"
                                     }`} title={hasHoliday.name}>
                                       {hasHoliday.name}
                                     </span>
@@ -3346,7 +3545,7 @@ export default function App() {
                       if (hasHoliday.type === "public") {
                         tapeClass = "bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-200";
                       } else {
-                        tapeClass = "bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200";
+                        tapeClass = "bg-orange-50 hover:bg-orange-100 text-orange-800 border border-orange-200";
                       }
                     } else if (d.isWeekend) {
                       tapeClass = "bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800 border border-emerald-100/60";
@@ -3365,7 +3564,7 @@ export default function App() {
                         <span className="text-base font-black mt-0.5 relative">
                           {d.dateNum}
                           {hasHoliday && (
-                            <span className={`absolute -top-1 -right-1 text-[8px] ${hasHoliday.type === 'public' ? 'text-amber-500' : 'text-rose-500'}`}>⭐</span>
+                            <span className={`absolute -top-1 -right-1 text-[8px] ${hasHoliday.type === 'public' ? 'text-amber-500' : 'text-orange-500'}`}>⭐</span>
                           )}
                         </span>
                       </button>
@@ -3686,7 +3885,7 @@ export default function App() {
                       if (hasHoliday.type === "public") {
                         headerBg = "bg-amber-500 text-white";
                       } else {
-                        headerBg = "bg-rose-500 text-white";
+                        headerBg = "bg-orange-500 text-white";
                       }
                     }
 
@@ -3779,7 +3978,7 @@ export default function App() {
                           // Background column indicator highlights
                           let cellBg = "";
                           if (d.holiday) {
-                            cellBg = d.holiday.type === "public" ? "bg-amber-50/50" : "bg-rose-50/40";
+                            cellBg = d.holiday.type === "public" ? "bg-amber-50/50" : "bg-orange-50/40";
                           } else if (d.obj.getDay() === 6) { // Sat
                             cellBg = "bg-purple-50/15";
                           } else if (d.obj.getDay() === 0) { // Sun
@@ -3918,7 +4117,7 @@ export default function App() {
                   if (hasHoliday.type === "public") {
                     borderBg = "bg-amber-50/50 border-amber-200 hover:bg-amber-50";
                   } else {
-                    borderBg = "bg-rose-50/40 border-rose-200 hover:bg-rose-50/60";
+                    borderBg = "bg-orange-50/40 border-orange-200 hover:bg-orange-50/60";
                   }
                 }
                 return (
@@ -3926,7 +4125,7 @@ export default function App() {
                     <div className="flex items-center justify-between mb-2 border-b border-gray-200/60 pb-1.5">
                       <span className="text-xs font-semibold text-gray-600">วันที่ {d.dateNum}</span>
                       {hasHoliday && (
-                        <span className={`text-[8.5px] font-black px-1 py-[1px] rounded-md leading-none truncate max-w-[65px] ${hasHoliday.type === 'public' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-rose-100 text-rose-800 border border-rose-200'}`} title={hasHoliday.name}>
+                        <span className={`text-[8.5px] font-black px-1 py-[1px] rounded-md leading-none truncate max-w-[65px] ${hasHoliday.type === 'public' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-orange-100 text-orange-800 border border-orange-200'}`} title={hasHoliday.name}>
                           {hasHoliday.name}
                         </span>
                       )}
@@ -3950,10 +4149,10 @@ export default function App() {
         </section>
 
         {/* 📅 จัดการวันหยุดนักขัตฤกษ์และวันหยุดบริษัท (Holiday Management) */}
-        <section className="bg-white rounded-2xl shadow-sm border border-rose-100 p-4 sm:p-5 shrink-0 mb-6 mx-auto w-full">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-50 pb-3 mb-4">
-            <h2 className="text-base sm:text-lg font-bold text-rose-800 flex items-center">
-               <CalendarRange className="w-5 h-5 mr-1.5 sm:mr-2 text-rose-600 shrink-0" />
+        <section className="bg-white rounded-2xl shadow-sm border border-orange-100 p-4 sm:p-5 shrink-0 mb-6 mx-auto w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-orange-50 pb-3 mb-4">
+            <h2 className="text-base sm:text-lg font-bold text-orange-800 flex items-center">
+               <CalendarRange className="w-5 h-5 mr-1.5 sm:mr-2 text-orange-600 shrink-0" />
                <span>ตารางวันหยุดนักขัตฤกษ์และวันหยุดบริษัท ({currentMonthStr})</span>
             </h2>
             <div className="flex items-center gap-2">
@@ -3961,9 +4160,9 @@ export default function App() {
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                 <span>วันหยุดนักขัตฤกษ์ (สีส้ม)</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200 px-2 py-1 rounded-lg">
-                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                <span>วันหยุดบริษัท (สีแดงอ่อน)</span>
+              <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold bg-orange-50 text-orange-800 border border-orange-200 px-2 py-1 rounded-lg">
+                <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                <span>วันหยุดบริษัท (สีส้มอ่อน)</span>
               </span>
             </div>
           </div>
@@ -3986,7 +4185,7 @@ export default function App() {
                         className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                           h.type === "public"
                             ? "bg-amber-50/60 border-amber-100 text-amber-900"
-                            : "bg-rose-50/40 border-rose-100 text-rose-900"
+                            : "bg-orange-50/40 border-orange-100 text-orange-950"
                         }`}
                       >
                         <div className="min-w-0 flex-1">
@@ -4004,6 +4203,34 @@ export default function App() {
                           <button
                             onClick={() => {
                               setHolidays(prev => prev.filter(item => item.date !== h.date));
+                              
+                              // Automatically update schedule to restore GROUP_1 to working staff if not weekend or on vacation
+                              setSchedule(prev => {
+                                const day = prev[h.date];
+                                if (!day) return prev;
+                                
+                                const dObj = new Date(h.date);
+                                const isWeekend = dObj.getDay() === 0 || dObj.getDay() === 6;
+                                
+                                let newWorking = [...day.workingStaff];
+                                if (!isWeekend) {
+                                  GROUP_1.forEach(staff => {
+                                    if (!newWorking.includes(staff) && !day.vacationStaff?.includes(staff)) {
+                                      newWorking.push(staff);
+                                    }
+                                  });
+                                }
+                                
+                                return rebalancePhones({
+                                  ...prev,
+                                  [h.date]: {
+                                    ...day,
+                                    workingStaff: newWorking,
+                                    fireCodes: assignFireCodes(newWorking),
+                                  }
+                                });
+                              });
+
                               showToast(`ลบวันหยุด "${h.name}" เรียบร้อยแล้ว`, false, new Date().toLocaleDateString("th-TH"));
                             }}
                             className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg transition-colors cursor-pointer ml-2 shrink-0"
@@ -4035,7 +4262,7 @@ export default function App() {
                       disabled={!isAdmin}
                       value={newHolidayDate}
                       onChange={(e) => setNewHolidayDate(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all disabled:opacity-50"
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all disabled:opacity-50"
                     />
                   </div>
 
@@ -4047,7 +4274,7 @@ export default function App() {
                       placeholder="เช่น วันขึ้นปีใหม่, วันหยุดประจำปีบริษัท"
                       value={newHolidayName}
                       onChange={(e) => setNewHolidayName(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all disabled:opacity-50"
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all disabled:opacity-50"
                     />
                   </div>
 
@@ -4073,11 +4300,11 @@ export default function App() {
                         onClick={() => setNewHolidayType("company")}
                         className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
                           newHolidayType === "company"
-                            ? "bg-rose-100 border-rose-300 text-rose-800 shadow-sm"
+                            ? "bg-orange-100 border-orange-300 text-orange-800 shadow-sm"
                             : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                         } disabled:opacity-50`}
                       >
-                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                        <span className="w-2 h-2 rounded-full bg-orange-500"></span>
                         <span>วันหยุดบริษัท</span>
                       </button>
                     </div>
@@ -4089,12 +4316,269 @@ export default function App() {
                 type="button"
                 disabled={!isAdmin || !newHolidayDate || !newHolidayName.trim()}
                 onClick={handleAddHoliday}
-                className="w-full mt-4 flex items-center justify-center gap-1.5 text-xs font-black bg-rose-600 hover:bg-rose-700 active:bg-rose-800 disabled:opacity-40 text-white py-2.5 rounded-xl transition-all shadow-xs cursor-pointer select-none"
+                className="w-full mt-4 flex items-center justify-center gap-1.5 text-xs font-black bg-orange-600 hover:bg-orange-700 active:bg-orange-800 disabled:opacity-40 text-white py-2.5 rounded-xl transition-all shadow-xs cursor-pointer select-none"
               >
                 <CalendarPlus className="w-4 h-4" />
                 <span>บันทึกวันหยุดใหม่</span>
               </button>
             </div>
+          </div>
+        </section>
+
+        {/* 🌴 โควตาและสถิติวันลาพักร้อนประจำปี (Annual Vacation Tracker & Quota) */}
+        <section className="bg-white rounded-2xl shadow-sm border border-orange-100 p-4 sm:p-5 shrink-0 mb-6 mx-auto w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-orange-50 pb-3 mb-4">
+            <h2 className="text-base sm:text-lg font-bold text-orange-800 flex items-center">
+               <Palmtree className="w-5 h-5 mr-1.5 sm:mr-2 text-orange-600 shrink-0" />
+               <span>สถิติและโควตาการลาพักร้อนประจำปี (8 วัน/ปี)</span>
+            </h2>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-orange-50/50 border border-orange-200/50 px-3 py-1.5 rounded-xl">
+                <span className="text-xs font-bold text-orange-800">เลือกปีปฏิทิน:</span>
+                <select
+                  value={vacationTrackerYear}
+                  onChange={(e) => setVacationTrackerYear(parseInt(e.target.value))}
+                  className="bg-white text-orange-950 text-xs font-black border border-orange-200 rounded-lg px-2 py-1 focus:ring-1 focus:ring-orange-500 focus:outline-none cursor-pointer"
+                >
+                  <option value={2025}>2025</option>
+                  <option value={2026}>2026</option>
+                  <option value={2027}>2027</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-amber-50/50 border border-amber-200/60 p-3 sm:p-4 rounded-xl text-left mb-6 text-xs text-amber-900 leading-relaxed font-bold flex items-start gap-2">
+            <Sparkles className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-extrabold text-amber-950">💡 ข้อมูลโควตาพักร้อน 8 วันต่อปี</p>
+              <p className="mt-1 font-medium text-amber-900">
+                ระบบจำกัดสิทธิ์การลาพักร้อนมาตรฐานที่ 8 วันต่อคนต่อปี โดยจะประมวลผลคำนวณวันพักร้อนที่ใช้ไปแล้วโดยอัตโนมัติแบบเรียลไทม์เมื่อท่านกำหนดสถานะวันพักร้อน (V) ในปฏิทินตารางปฏิบัติงาน
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* ฝั่งซ้าย: ตารางและโควตารายบุคคล */}
+            <div className={isAdmin ? "lg:col-span-8 w-full" : "lg:col-span-12 w-full"}>
+              <div className="overflow-x-auto rounded-xl border border-gray-150 shadow-2xs">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-150 text-gray-500 uppercase tracking-wider font-extrabold text-[10px]">
+                      <th className="p-3">เจ้าหน้าที่</th>
+                      <th className="p-3 text-center">สิทธิ์โควตา</th>
+                      <th className="p-3 text-center">ใช้ไปแล้ว</th>
+                      <th className="p-3 text-center">คงเหลือ</th>
+                      <th className="p-3">อัตราการใช้งาน</th>
+                      <th className="p-3 text-center">ประวัติ/จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white font-bold text-gray-700">
+                    {DISPLAY_ORDER.map(staff => {
+                      const vacDates = getStaffVacationDatesForYear(staff, vacationTrackerYear);
+                      const usedCount = vacDates.length;
+                      const remainingCount = Math.max(0, 8 - usedCount);
+                      const usagePercent = Math.min(100, (usedCount / 8) * 100);
+                      const isExpanded = expandedVacationStaff === staff;
+                      
+                      // Status colors
+                      let barColor = "bg-emerald-500";
+                      let textColor = "text-emerald-700";
+                      let bgBadge = "bg-emerald-50 text-emerald-800 border-emerald-200";
+                      let statusText = `เหลือ ${remainingCount} วัน`;
+                      
+                      if (usedCount > 8) {
+                        barColor = "bg-red-500";
+                        textColor = "text-red-700 font-extrabold";
+                        bgBadge = "bg-red-50 text-red-800 border-red-200 animate-pulse";
+                        statusText = `เกินโควตา ${usedCount - 8} วัน`;
+                      } else if (usedCount === 8) {
+                        barColor = "bg-amber-500";
+                        textColor = "text-amber-700 font-black";
+                        bgBadge = "bg-amber-50 text-amber-800 border-amber-200";
+                        statusText = "ครบสิทธิ์พอดี";
+                      } else if (usedCount >= 6) {
+                        barColor = "bg-amber-500";
+                        textColor = "text-amber-700";
+                        bgBadge = "bg-amber-50 text-amber-800 border-amber-200";
+                      }
+
+                      return (
+                        <React.Fragment key={staff}>
+                          <tr className={`hover:bg-gray-50/50 transition-colors ${isExpanded ? "bg-orange-50/20" : ""}`}>
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2.5 h-2.5 rounded-full ${GROUP_1.includes(staff) ? "bg-amber-400" : "bg-emerald-400"}`} />
+                                <span className="text-gray-900 font-black">คุณ{staff}</span>
+                                {currentUser === staff && (
+                                  <span className="bg-sky-100 text-sky-800 border border-sky-200 text-[8px] px-1 py-0.2 rounded-md font-bold">ฉัน</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-center text-gray-400">8 วัน</td>
+                            <td className="p-3 text-center font-black text-gray-900 text-sm">{usedCount} วัน</td>
+                            <td className={`p-3 text-center text-sm ${textColor}`}>{remainingCount} วัน</td>
+                            <td className="p-3">
+                              <div className="flex flex-col gap-1 w-32 sm:w-40 md:w-48">
+                                <div className="flex justify-between text-[9px] text-gray-400 font-semibold">
+                                  <span>{Math.round(usagePercent)}%</span>
+                                  <span className={`px-1 rounded-sm border text-[8px] font-extrabold ${bgBadge}`}>{statusText}</span>
+                                </div>
+                                <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${usagePercent}%` }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3 text-center">
+                              <button
+                                onClick={() => setExpandedVacationStaff(isExpanded ? null : staff)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer border ${
+                                  isExpanded 
+                                    ? "bg-orange-600 text-white border-orange-600" 
+                                    : "bg-white text-orange-800 border-orange-200 hover:bg-orange-50"
+                                }`}
+                              >
+                                {isExpanded ? "ปิดประวัติ ✖" : `ดูประวัติ (${usedCount}) 🌴`}
+                              </button>
+                            </td>
+                          </tr>
+
+                          {/* Expanded Row showing details */}
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={6} className="p-4 bg-orange-50/15 border-t border-b border-orange-100 text-left">
+                                <div className="flex flex-col gap-3">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-extrabold text-orange-900 text-xs flex items-center gap-1">
+                                      <Palmtree className="w-4 h-4 text-orange-600" />
+                                      รายละเอียดวันพักร้อนปฏิทินปี {vacationTrackerYear} ของ คุณ{staff}
+                                    </span>
+                                    <span className="text-[10px] text-gray-500">ทั้งหมด {usedCount} วัน</span>
+                                  </div>
+
+                                  {vacDates.length === 0 ? (
+                                    <div className="text-center py-6 bg-white border border-dashed border-orange-200 rounded-xl">
+                                      <span className="text-gray-400 italic text-xs">คุณ{staff} ยังไม่มีการลงบันทึกพักร้อนในปี {vacationTrackerYear}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                      {vacDates.map(vd => {
+                                        const dateParts = vd.date.split('-');
+                                        const y = dateParts[0];
+                                        const m = dateParts[1];
+                                        const formattedThai = vd.dateObj.toLocaleDateString("th-TH", {
+                                          day: "numeric",
+                                          month: "long",
+                                          weekday: "short"
+                                        });
+
+                                        return (
+                                          <div key={vd.date} className="bg-white border border-orange-100 rounded-xl p-2.5 flex items-center justify-between shadow-3xs hover:border-orange-300 transition-all">
+                                            <div className="min-w-0">
+                                              <span className="text-[10px] font-black text-gray-800 block truncate">{formattedThai}</span>
+                                              <span className="text-[8px] font-mono text-gray-400 block mt-0.5">{vd.date}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              <button
+                                                onClick={() => {
+                                                  // Jump to date on calendar
+                                                  setCurrentMonthStr(`${y}-${m}`);
+                                                  setSelectedDate(vd.date);
+                                                  showToast(`🔍 ส่องปฏิทินไปยังวันที่ ${formattedThai}`, false, vd.date);
+                                                  const element = document.getElementById("department-schedule-table");
+                                                  if (element) {
+                                                    element.scrollIntoView({ behavior: "smooth" });
+                                                  }
+                                                }}
+                                                className="bg-emerald-50 text-emerald-800 border border-emerald-100 hover:bg-emerald-100 px-1.5 py-0.5 rounded text-[9px] font-extrabold cursor-pointer transition-colors"
+                                                title="ส่องปฏิทินและรายละเอียดเวร"
+                                              >
+                                                ส่อง 🔍
+                                              </button>
+                                              {isAdmin && (
+                                                <button
+                                                  onClick={() => handleRemoveVacation(vd.date, staff)}
+                                                  className="bg-red-50 text-red-700 border border-red-100 hover:bg-red-100 p-1 rounded cursor-pointer transition-colors"
+                                                  title="ยกเลิกวันพักร้อนนี้"
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ฝั่งขวา: เครื่องมือบันทึกวันลาพักร้อนด่วนสำหรับผู้ดูแลระบบ (แสดงเฉพาะเมื่อเป็น Admin เท่านั้น) */}
+            {isAdmin && (
+              <div className="lg:col-span-4 bg-orange-50/30 border border-orange-100/60 rounded-xl p-4 flex flex-col justify-between text-left">
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-orange-900 flex items-center gap-1.5 border-b border-orange-100 pb-2 mb-3">
+                    <CalendarPlus className="w-4 h-4 text-orange-600" />
+                    <span>บันทึกวันลาพักร้อนด่วน (Admin)</span>
+                  </h3>
+                  <p className="text-[10px] text-gray-500 leading-relaxed mb-4 font-bold">
+                    อำนวยความสะดวกสำหรับผู้ดูแลระบบ สามารถลงบันทึกการพักร้อนให้กับเจ้าหน้าที่รายบุคคลได้อย่างรวดเร็ว โดยระบบจะปลดเวร (OFF) และบันทึกวันหยุดพักร้อน (V) ให้ทันที
+                  </p>
+
+                  <form onSubmit={handleQuickVacationSubmit} className="flex flex-col gap-3">
+                    <div>
+                      <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1">
+                        1. เลือกเจ้าหน้าที่พนักงาน
+                      </label>
+                      <select
+                        value={quickVacStaff}
+                        onChange={(e) => setQuickVacStaff(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 focus:outline-none text-gray-800 font-bold shadow-2xs"
+                      >
+                        {ALL_STAFF.map(s => (
+                          <option key={s} value={s}>คุณ{s}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1">
+                        2. เลือกวันที่ลาพักร้อน
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={quickVacDate}
+                        onChange={(e) => setQuickVacDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 focus:outline-none text-gray-800 font-bold shadow-2xs"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={!quickVacDate}
+                      className="w-full mt-2 flex items-center justify-center gap-1.5 text-xs font-black bg-orange-600 hover:bg-orange-700 active:bg-orange-800 disabled:opacity-40 text-white py-2 rounded-lg transition-all shadow-2xs cursor-pointer select-none"
+                    >
+                      <Palmtree className="w-4 h-4 text-white" />
+                      <span>บันทึกการลาพักร้อน</span>
+                    </button>
+                  </form>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-orange-100/60 text-[9px] text-gray-400 font-semibold">
+                  📌 หลังจากบันทึกแล้ว ตารางปฏิบัติงานด้านบนจะเปลี่ยนเป็นแถบสีส้มอ่อนและมีสัญลักษณ์พักร้อน (V) โดยอัตโนมัติ
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
