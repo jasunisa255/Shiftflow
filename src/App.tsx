@@ -349,6 +349,61 @@ function getInitialSchedule(year: number, month: number, customHolidays?: Holida
   return rebalancePhones(schedule);
 }
 
+const Phyathai2Logo = ({ className = "h-12", showText = true, lightMode = false }: { className?: string; showText?: boolean; lightMode?: boolean }) => {
+  return (
+    <div className={`flex items-center gap-2.5 ${className}`}>
+      <svg viewBox="0 0 100 100" className="h-full w-auto shrink-0 select-none overflow-visible">
+        {/* Green Molecule (Bottom Left) */}
+        <g>
+          <line x1="30" y1="42" x2="30" y2="78" stroke="#84cc16" strokeWidth="12" strokeLinecap="round" />
+          <line x1="12" y1="60" x2="48" y2="60" stroke="#84cc16" strokeWidth="12" strokeLinecap="round" />
+          <circle cx="30" cy="42" r="6" fill="#84cc16" />
+          <circle cx="30" cy="78" r="6" fill="#84cc16" />
+          <circle cx="12" cy="60" r="6" fill="#84cc16" />
+          <circle cx="48" cy="60" r="6" fill="#84cc16" />
+          <circle cx="30" cy="60" r="6" fill="#84cc16" />
+        </g>
+        
+        {/* Gray Molecule (Middle Right) */}
+        <g>
+          <line x1="68" y1="37" x2="68" y2="73" stroke="#64748b" strokeWidth="12" strokeLinecap="round" />
+          <line x1="50" y1="55" x2="86" y2="55" stroke="#64748b" strokeWidth="12" strokeLinecap="round" />
+          <circle cx="68" cy="37" r="6" fill="#64748b" />
+          <circle cx="68" cy="73" r="6" fill="#64748b" />
+          <circle cx="50" cy="55" r="6" fill="#64748b" />
+          <circle cx="86" cy="55" r="6" fill="#64748b" />
+          <circle cx="68" cy="55" r="6" fill="#64748b" />
+        </g>
+
+        {/* Deep Teal Molecule (Top Left/Center) - Overlaps others */}
+        <g>
+          <line x1="45" y1="17" x2="45" y2="53" stroke="#047857" strokeWidth="13" strokeLinecap="round" />
+          <line x1="27" y1="35" x2="63" y2="35" stroke="#047857" strokeWidth="13" strokeLinecap="round" />
+          <circle cx="45" cy="17" r="6.5" fill="#047857" />
+          <circle cx="45" cy="53" r="6.5" fill="#047857" />
+          <circle cx="27" cy="35" r="6.5" fill="#047857" />
+          <circle cx="63" cy="35" r="6.5" fill="#047857" />
+          <circle cx="45" cy="35" r="6.5" fill="#047857" />
+        </g>
+      </svg>
+      
+      {showText && (
+        <div className="flex flex-col text-left justify-center select-none">
+          <span className={`font-black tracking-tight leading-none text-base sm:text-lg ${lightMode ? "text-slate-800" : "text-white"}`}>
+            พญาไท <span className="text-emerald-500 font-black">2</span>
+          </span>
+          <span className={`text-[9px] sm:text-[10px] font-black tracking-[0.2em] leading-none mt-1 ${lightMode ? "text-slate-500" : "text-emerald-400"}`}>
+            PHYATHAI 2
+          </span>
+          <span className={`text-[7px] font-bold tracking-wider leading-none mt-1 ${lightMode ? "text-slate-400" : "text-slate-500"}`}>
+            สนามเป้า • SANAM PAO
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function App() {
   const currentNow = new Date();
   const [currentMonthStr, setCurrentMonthStr] = useState(`${currentNow.getFullYear()}-${String(currentNow.getMonth() + 1).padStart(2, '0')}`);
@@ -394,6 +449,25 @@ export default function App() {
   const [expandedVacationStaff, setExpandedVacationStaff] = useState<string | null>(null);
   const [quickVacStaff, setQuickVacStaff] = useState<string>(ALL_STAFF[0]);
   const [quickVacDate, setQuickVacDate] = useState<string>("");
+  const [quickVacEndDate, setQuickVacEndDate] = useState<string>("");
+
+  const [vacationQuotas, setVacationQuotas] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem("hospitalSchedule_vacationQuotas");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    const initial: Record<string, number> = {};
+    ALL_STAFF.forEach(staff => {
+      initial[staff] = 8; // Default is 8 days per year
+    });
+    return initial;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("hospitalSchedule_vacationQuotas", JSON.stringify(vacationQuotas));
+  }, [vacationQuotas]);
 
 
   const [holidays, setHolidays] = useState<Holiday[]>(() => {
@@ -1422,78 +1496,99 @@ export default function App() {
       return;
     }
     
-    const dateKey = quickVacDate;
-    const [yStr, mStr] = dateKey.split('-');
-    const year = parseInt(yStr);
-    const month = parseInt(mStr) - 1;
+    const start = new Date(quickVacDate);
+    const end = quickVacEndDate ? new Date(quickVacEndDate) : start;
+    
+    if (end < start) {
+      showToast("❌ วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่มต้น", false, new Date().toLocaleDateString("th-TH"));
+      return;
+    }
+
+    const datesToUpdate: string[] = [];
+    let current = new Date(start);
+    while (current <= end) {
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, '0');
+      const d = String(current.getDate()).padStart(2, '0');
+      datesToUpdate.push(`${y}-${m}-${d}`);
+      current.setDate(current.getDate() + 1);
+    }
     
     setSchedule(prev => {
       let updated = { ...prev };
-      const testDateStr = `${yStr}-${mStr}-01`;
-      if (!updated[testDateStr]) {
-        const newMonth = getInitialSchedule(year, month, holidays);
-        updated = { ...updated, ...newMonth };
-      }
       
-      const day = updated[dateKey];
-      if (!day) return prev;
-      
-      let newWorking = [...day.workingStaff];
-      let newVac = [...(day.vacationStaff || [])];
-      
-      if (!newVac.includes(quickVacStaff)) {
-        newVac.push(quickVacStaff);
-      }
-      newWorking = newWorking.filter(s => s !== quickVacStaff);
-      
-      let newDoc = day.docInCharge;
-      if (quickVacStaff === day.docInCharge) {
-        const docCounts: Record<string, number> = {};
-        Object.keys(updated).forEach(dKey => {
-          if (dKey !== dateKey) {
-            const doc = updated[dKey].docInCharge;
-            if (doc) docCounts[doc] = (docCounts[doc] || 0) + 1;
-          }
-        });
-        const availableDocs = newWorking.filter(s => GROUP_2.includes(s));
-        if (availableDocs.length > 0) {
-          availableDocs.sort((a, b) => (docCounts[a] || 0) - (docCounts[b] || 0));
-          newDoc = availableDocs[0];
-        } else {
-          newDoc = null;
+      datesToUpdate.forEach(dateKey => {
+        const [yStr, mStr] = dateKey.split('-');
+        const year = parseInt(yStr);
+        const month = parseInt(mStr) - 1;
+        
+        const testDateStr = `${yStr}-${mStr}-01`;
+        if (!updated[testDateStr]) {
+          const newMonth = getInitialSchedule(year, month, holidays);
+          updated = { ...updated, ...newMonth };
         }
-      }
-      
-      const logEntry: LogEntry = {
-        id: Date.now(),
-        date: dateKey,
-        timestamp: new Date().toISOString(),
-        personOut: quickVacStaff,
-        personIn: 'พักร้อน (บันทึกด่วน)',
-        inChargeTriggered: false,
-      };
-      setLogs(l => [logEntry, ...l].slice(0, 100));
-      
-      const readableDate = new Date(dateKey).toLocaleDateString("th-TH", {
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      });
-      showToast(`🎉 บันทึกการพักร้อนสำหรับ คุณ${quickVacStaff} วันที่ ${readableDate} สำเร็จ`, false, readableDate);
-      
-      return rebalancePhones({
-        ...updated,
-        [dateKey]: {
+        
+        const day = updated[dateKey];
+        if (!day) return;
+        
+        let newWorking = [...day.workingStaff];
+        let newVac = [...(day.vacationStaff || [])];
+        
+        if (!newVac.includes(quickVacStaff)) {
+          newVac.push(quickVacStaff);
+        }
+        newWorking = newWorking.filter(s => s !== quickVacStaff);
+        
+        let newDoc = day.docInCharge;
+        if (quickVacStaff === day.docInCharge) {
+          const docCounts: Record<string, number> = {};
+          Object.keys(updated).forEach(dKey => {
+            if (dKey !== dateKey) {
+              const doc = updated[dKey].docInCharge;
+              if (doc) docCounts[doc] = (docCounts[doc] || 0) + 1;
+            }
+          });
+          const availableDocs = newWorking.filter(s => GROUP_2.includes(s));
+          if (availableDocs.length > 0) {
+            availableDocs.sort((a, b) => (docCounts[a] || 0) - (docCounts[b] || 0));
+            newDoc = availableDocs[0];
+          } else {
+            newDoc = null;
+          }
+        }
+        
+        updated[dateKey] = {
           ...day,
           workingStaff: newWorking,
           vacationStaff: newVac,
           fireCodes: assignFireCodes(newWorking),
           docInCharge: newDoc
-        }
+        };
+
+        const logEntry: LogEntry = {
+          id: Date.now() + Math.random(),
+          date: dateKey,
+          timestamp: new Date().toISOString(),
+          personOut: quickVacStaff,
+          personIn: 'พักร้อน (บันทึกด่วน)',
+          inChargeTriggered: false,
+        };
+        setLogs(l => [logEntry, ...l].slice(0, 100));
       });
+      
+      return rebalancePhones(updated);
     });
     
+    const readableStart = new Date(quickVacDate).toLocaleDateString("th-TH", { day: 'numeric', month: 'short' });
+    const readableEnd = quickVacEndDate ? new Date(quickVacEndDate).toLocaleDateString("th-TH", { day: 'numeric', month: 'short' }) : "";
+    const rangeMessage = quickVacEndDate && quickVacEndDate !== quickVacDate 
+      ? `ระหว่างวันที่ ${readableStart} ถึง ${readableEnd}` 
+      : `วันที่ ${readableStart}`;
+
+    showToast(`🎉 บันทึกการพักร้อนสำหรับ คุณ${quickVacStaff} ${rangeMessage} สำเร็จ`, false, quickVacDate);
+    
     setQuickVacDate("");
+    setQuickVacEndDate("");
   };
 
   const handleRemoveVacation = (dateKey: string, staff: string) => {
@@ -1750,28 +1845,13 @@ export default function App() {
             {/* Phyathai 2 Official Logo Image Wrapper */}
             <div className="relative group inline-block">
               <div className="absolute -inset-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl blur-md opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
-              <div className="relative w-24 h-24 bg-white p-2.5 rounded-3xl shadow-2xl flex items-center justify-center overflow-hidden border border-slate-800/20">
-                <img 
-                  src="https://graph.facebook.com/Phyathai2Hospital/picture?width=300&height=300" 
-                  alt="โรงพยาบาลพญาไท 2" 
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-contain rounded-2xl"
-                  onError={(e) => {
-                    // Fallback to beautiful custom inline SVG if blocked or offline
-                    (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23ffffff"/><path d="M50 15 C30 15 20 30 20 50 C20 70 35 85 50 85 C65 85 80 70 80 50 C80 30 70 15 50 15 Z" fill="none" stroke="%23047857" stroke-width="8"/><path d="M50 30 L50 70 M30 50 L70 50" stroke="%230284c7" stroke-width="10" stroke-linecap="round"/></svg>';
-                  }}
-                />
+              <div className="relative px-6 py-4.5 bg-white rounded-3xl shadow-2xl flex items-center justify-center overflow-hidden border border-slate-800/20">
+                <Phyathai2Logo className="h-14 sm:h-16" lightMode={true} showText={true} />
               </div>
             </div>
             
-            <div className="mt-4">
-              <span className="text-[10px] font-extrabold tracking-[0.25em] text-emerald-400 uppercase bg-emerald-950/80 px-3.5 py-1.5 rounded-full border border-emerald-800/40 shadow-inner">
-                PHYATHAI 2 HOSPITAL
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-3.5 drop-shadow-md">
-                โรงพยาบาลพญาไท 2
-              </h1>
-              <p className="text-slate-400 text-sm mt-1.5 font-bold flex items-center justify-center gap-1.5">
+            <div className="mt-6">
+              <p className="text-slate-400 text-sm font-bold flex items-center justify-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 ระบบบริหารจัดการตารางเวร แผนกพิมพ์ผล
               </p>
@@ -1974,15 +2054,13 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans pb-12 flex flex-col">
       <header className="bg-emerald-700 text-white p-4 shadow-md sticky top-0 z-30">
         <div className="w-full px-2 sm:px-4 md:px-6 lg:px-8 mx-auto flex flex-col md:flex-row justify-between items-center gap-4 relative">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
-              <Stethoscope className="w-6 h-6 text-white" />
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 p-2 sm:p-2.5 rounded-2xl border border-white/10 backdrop-blur-md shadow-inner">
+              <Phyathai2Logo className="h-10 sm:h-11" showText={true} lightMode={false} />
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-wide">ShiftFlow Medical Checkup Report</h1>
-              <p className="text-emerald-100 text-xs mt-0.5">
-                ระบบบริหารจัดการตารางเวรและแจ้งเตือน แผนกพิมพ์ผล
-              </p>
+            <div className="hidden lg:block border-l border-white/20 pl-4 py-1">
+              <h2 className="text-sm font-black text-emerald-200 tracking-wider">แผนกพิมพ์ผล</h2>
+              <p className="text-[10px] text-emerald-100/70 font-semibold">ShiftFlow Medical Checkup</p>
             </div>
           </div>
 
@@ -4355,6 +4433,68 @@ export default function App() {
           </section>
         </div>
 
+        {/* 🌴 สรุปจำนวนวันหยุดประจำเดือนของเจ้าหน้าที่ทุกคน */}
+        <section className="bg-white rounded-2xl shadow-sm border border-emerald-100/60 p-4 sm:p-5 shrink-0 mb-6 mx-auto w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-emerald-50 pb-3">
+            <h2 className="text-base sm:text-lg font-bold text-emerald-800 flex items-center">
+               <Palmtree className="w-5 h-5 mr-1.5 sm:mr-2 text-emerald-650 shrink-0" />
+               <span>🌴 สรุปจำนวนวันหยุดประจำเดือนของเจ้าหน้าที่ ({new Date(`${currentMonthStr}-01`).toLocaleDateString("th-TH", { month: 'long', year: 'numeric' })})</span>
+            </h2>
+            <div className="text-[10px] sm:text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/50 px-2.5 py-1 rounded-lg">
+              คำนวณจาก: วันหยุดปกติ (OFF) และ วันลาพักร้อน (VAC)
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+             {DISPLAY_ORDER.map(staff => {
+                const staffStats = getStaffStats(staff);
+                const isOwner = currentUser === staff;
+                const totalOff = staffStats.offDays + staffStats.vacationDays;
+                
+                return (
+                  <div 
+                    key={staff} 
+                    className={`border rounded-2xl p-3 flex flex-col items-center justify-center relative overflow-hidden group transition-all duration-300 ${
+                      isOwner 
+                        ? "bg-gradient-to-br from-emerald-600 to-teal-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20 scale-[1.03] ring-2 ring-emerald-400 ring-offset-2 z-10" 
+                        : "bg-slate-50 border-slate-100/80 hover:border-emerald-300/50 hover:bg-white"
+                    }`}
+                  >
+                    {isOwner && (
+                      <span className="absolute top-1.5 right-1.5 text-[8px] font-black bg-amber-400 text-emerald-950 px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                        คุณ (เจ้าของ)
+                      </span>
+                    )}
+                    
+                    <span className={`text-xs sm:text-sm font-black z-10 truncate w-full text-center ${isOwner ? "text-white" : "text-slate-800"}`}>
+                      คุณ{staff}
+                    </span>
+                    
+                    <div className="flex flex-col items-center mt-1 z-10">
+                      <span className={`text-2xl sm:text-3xl font-extrabold ${isOwner ? "text-amber-300" : "text-emerald-600"} tracking-tight`}>
+                        {totalOff} <span className="text-xs font-bold opacity-80">วัน</span>
+                      </span>
+                      
+                      <div className={`text-[9px] mt-1 flex flex-col items-center font-bold gap-0.5 ${isOwner ? "text-emerald-100" : "text-slate-400"}`}>
+                        <span>หยุดปกติ: {staffStats.offDays} วัน</span>
+                        {staffStats.vacationDays > 0 && (
+                          <span className={`${isOwner ? "text-amber-200" : "text-orange-600"}`}>พักร้อน (V): {staffStats.vacationDays} วัน</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="w-full bg-slate-200/50 h-1 rounded-full mt-2 overflow-hidden max-w-[60px]">
+                      <div 
+                        className={`h-full rounded-full ${isOwner ? "bg-amber-300" : "bg-emerald-500"}`} 
+                        style={{ width: `${Math.min(100, (totalOff / 15) * 100)}%` }} 
+                      />
+                    </div>
+                  </div>
+                );
+             })}
+          </div>
+        </section>
+
         {/* แดชบอร์ดแบบรายวัน เหมือนในรูปของ User */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-5 shrink-0 mb-6 mx-auto w-full">
           <h2 className="text-base sm:text-lg font-semibold text-gray-800 flex items-center mb-3 sm:mb-4">
@@ -4604,9 +4744,9 @@ export default function App() {
           <div className="bg-amber-50/50 border border-amber-200/60 p-3 sm:p-4 rounded-xl text-left mb-6 text-xs text-amber-900 leading-relaxed font-bold flex items-start gap-2">
             <Sparkles className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <div>
-              <p className="font-extrabold text-amber-950">💡 ข้อมูลโควตาพักร้อน 8 วันต่อปี</p>
+              <p className="font-extrabold text-amber-950">💡 ข้อมูลและการตั้งค่าโควตาพักร้อนประจำปี</p>
               <p className="mt-1 font-medium text-amber-900">
-                ระบบจำกัดสิทธิ์การลาพักร้อนมาตรฐานที่ 8 วันต่อคนต่อปี โดยจะประมวลผลคำนวณวันพักร้อนที่ใช้ไปแล้วโดยอัตโนมัติแบบเรียลไทม์เมื่อท่านกำหนดสถานะวันพักร้อน (V) ในปฏิทินตารางปฏิบัติงาน
+                ระบบจำกัดสิทธิ์การลาพักร้อนมาตรฐานที่ 8 วันต่อคนต่อปี โดยคำนวณวันพักร้อนที่ใช้ไปแบบเรียลไทม์จากตัวอักษร (V) บนปฏิทิน และพิเศษสำหรับ **Admin** สามารถแก้ไขปรับปรุงโควตาวันลาสะสมของเจ้าหน้าที่แต่ละคนได้โดยตรงในตารางด้านล่างนี้
               </p>
             </div>
           </div>
@@ -4628,10 +4768,11 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white font-bold text-gray-700">
                     {DISPLAY_ORDER.map(staff => {
+                      const staffQuota = vacationQuotas[staff] !== undefined ? vacationQuotas[staff] : 8;
                       const vacDates = getStaffVacationDatesForYear(staff, vacationTrackerYear);
                       const usedCount = vacDates.length;
-                      const remainingCount = Math.max(0, 8 - usedCount);
-                      const usagePercent = Math.min(100, (usedCount / 8) * 100);
+                      const remainingCount = Math.max(0, staffQuota - usedCount);
+                      const usagePercent = Math.min(100, (usedCount / staffQuota) * 100);
                       const isExpanded = expandedVacationStaff === staff;
                       
                       // Status colors
@@ -4640,17 +4781,17 @@ export default function App() {
                       let bgBadge = "bg-emerald-50 text-emerald-800 border-emerald-200";
                       let statusText = `เหลือ ${remainingCount} วัน`;
                       
-                      if (usedCount > 8) {
+                      if (usedCount > staffQuota) {
                         barColor = "bg-red-500";
                         textColor = "text-red-700 font-extrabold";
                         bgBadge = "bg-red-50 text-red-800 border-red-200 animate-pulse";
-                        statusText = `เกินโควตา ${usedCount - 8} วัน`;
-                      } else if (usedCount === 8) {
+                        statusText = `เกินโควตา ${usedCount - staffQuota} วัน`;
+                      } else if (usedCount === staffQuota) {
                         barColor = "bg-amber-500";
                         textColor = "text-amber-700 font-black";
                         bgBadge = "bg-amber-50 text-amber-800 border-amber-200";
                         statusText = "ครบสิทธิ์พอดี";
-                      } else if (usedCount >= 6) {
+                      } else if (usedCount >= staffQuota * 0.75) {
                         barColor = "bg-amber-500";
                         textColor = "text-amber-700";
                         bgBadge = "bg-amber-50 text-amber-800 border-amber-200";
@@ -4674,7 +4815,29 @@ export default function App() {
                                 )}
                               </div>
                             </td>
-                            <td className="p-3 text-center text-gray-400">8 วัน</td>
+                            <td className="p-3 text-center">
+                              {isAdmin ? (
+                                <div className="flex items-center justify-center gap-1">
+                                  <input 
+                                    type="number" 
+                                    min={1} 
+                                    max={60} 
+                                    value={staffQuota} 
+                                    onChange={(e) => {
+                                      const newVal = parseInt(e.target.value) || 8;
+                                      setVacationQuotas(prev => ({
+                                        ...prev,
+                                        [staff]: newVal
+                                      }));
+                                    }}
+                                    className="w-12 text-center bg-orange-50/60 border border-orange-200 rounded-lg p-1 text-xs font-black focus:ring-1 focus:ring-orange-500 text-orange-950 focus:outline-none"
+                                  />
+                                  <span className="text-gray-400 text-[10px] font-bold">วัน</span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-500">{staffQuota} วัน</span>
+                              )}
+                            </td>
                             <td className="p-3 text-center font-black text-gray-900 text-sm">{usedCount} วัน</td>
                             <td className={`p-3 text-center text-sm ${textColor}`}>{remainingCount} วัน</td>
                             <td className="p-3">
@@ -4809,23 +4972,38 @@ export default function App() {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1">
-                        2. เลือกวันที่ลาพักร้อน
-                      </label>
-                      <input
-                        type="date"
-                        required
-                        value={quickVacDate}
-                        onChange={(e) => setQuickVacDate(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 focus:outline-none text-gray-800 font-bold shadow-2xs"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1">
+                          2. วันที่เริ่มต้น
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={quickVacDate}
+                          onChange={(e) => setQuickVacDate(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 focus:outline-none text-gray-800 font-bold shadow-2xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1">
+                          3. วันที่สิ้นสุด (ตัวเลือก)
+                        </label>
+                        <input
+                          type="date"
+                          value={quickVacEndDate}
+                          onChange={(e) => setQuickVacEndDate(e.target.value)}
+                          placeholder="วันเดียวกับวันเริ่ม"
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 focus:outline-none text-gray-800 font-bold shadow-2xs"
+                        />
+                      </div>
                     </div>
 
                     <button
                       type="submit"
                       disabled={!quickVacDate}
-                      className="w-full mt-2 flex items-center justify-center gap-1.5 text-xs font-black bg-orange-600 hover:bg-orange-700 active:bg-orange-800 disabled:opacity-40 text-white py-2 rounded-lg transition-all shadow-2xs cursor-pointer select-none"
+                      className="w-full mt-2 flex items-center justify-center gap-1.5 text-xs font-black bg-orange-600 hover:bg-orange-700 active:bg-orange-800 disabled:opacity-40 text-white py-2.5 rounded-lg transition-all shadow-2xs cursor-pointer select-none"
                     >
                       <Palmtree className="w-4 h-4 text-white" />
                       <span>บันทึกการลาพักร้อน</span>
