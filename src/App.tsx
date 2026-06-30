@@ -1732,6 +1732,221 @@ export default function App() {
     e.target.value = '';
   };
 
+  if (!currentUser && !isAdmin) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-gray-800 font-sans flex flex-col justify-between relative overflow-hidden">
+        {/* Decorative Background Elements */}
+        <div className="absolute top-0 left-0 w-full h-96 bg-emerald-700 -skew-y-6 origin-top-left -z-10 shadow-lg" />
+        <div className="absolute -bottom-48 -right-48 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl -z-10" />
+        <div className="absolute -top-12 -left-12 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl -z-10" />
+
+        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center text-white mb-8"
+          >
+            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md inline-flex items-center justify-center mb-4 shadow-lg border border-white/20">
+              <Stethoscope className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-wide drop-shadow-sm">
+              ShiftFlow Medical Checkup Report
+            </h1>
+            <p className="text-emerald-100/90 text-sm mt-1.5 font-bold">
+              ระบบบริหารจัดการตารางเวรและแจ้งเตือน แผนกพิมพ์ผล
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            className="bg-white rounded-2xl shadow-2xl border border-gray-150 max-w-md w-full overflow-hidden text-left"
+          >
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 text-white text-center relative">
+              <div className="bg-white/20 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                <Lock className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-lg font-bold">กรุณาลงชื่อเข้าใช้งานระบบเพื่อดูข้อมูล</h3>
+              <p className="text-emerald-100 text-xs mt-1">
+                สำหรับเจ้าหน้าที่แผนกพิมพ์ผลและแอดมิน เพื่อความปลอดภัยของข้อมูลปฏิบัติงาน
+              </p>
+            </div>
+
+            {/* Tabs for Login Type */}
+            <div className="flex border-b border-gray-100 bg-gray-50/50 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginTab("staff");
+                  setPasswordError("");
+                  setPasswordInput("");
+                }}
+                className={`flex-1 py-3.5 text-xs sm:text-sm font-bold text-center transition-all cursor-pointer rounded-xl ${
+                  loginTab === "staff"
+                    ? "bg-white text-emerald-800 shadow-sm border-b-2 border-emerald-600"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                👤 สิทธิ์เจ้าหน้าที่ในทีม (Staff)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginTab("admin");
+                  setPasswordError("");
+                  setPasswordInput("");
+                }}
+                className={`flex-1 py-3.5 text-xs sm:text-sm font-bold text-center transition-all cursor-pointer rounded-xl ${
+                  loginTab === "admin"
+                    ? "bg-white text-amber-600 shadow-sm border-b-2 border-amber-500"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                🛡️ สิทธิ์ผู้ดูแลระบบ (Admin)
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (loginTab === "staff") {
+                  if (passwordInput === "1234") {
+                    setCurrentUser(selectedLoginStaff);
+                    setSelectedStaffFilter(selectedLoginStaff);
+                    setIsAdmin(false);
+                    setIsAdminConsoleOpen(false);
+                    setPasswordInput("");
+                    setPasswordError("");
+                    showToast(`เข้าสู่ระบบในฐานะคุณ "${selectedLoginStaff}" สำเร็จ!`, false, new Date().toLocaleDateString("th-TH"));
+                  } else {
+                    setPasswordError("รหัสผ่านไม่ถูกต้อง สำหรับสิทธิ์เจ้าหน้าที่กรุณาใช้รหัส 1234");
+                  }
+                } else {
+                  if (passwordInput === "1234" || passwordInput.toLowerCase() === "admin") {
+                    setIsAdmin(true);
+                    setIsAdminConsoleOpen(true);
+                    setCurrentUser(null);
+                    setPasswordInput("");
+                    setPasswordError("");
+                    showToast("เข้าสู่ระบบผู้ดูแลระบบ (Admin) สำเร็จ ยินดีต้อนรับ!", false, new Date().toLocaleDateString("th-TH"));
+                  } else {
+                    setPasswordError("รหัสผ่านไม่ถูกต้อง สำหรับแอดมินกรุณาลองใหม่อีกครั้ง");
+                  }
+                }
+              }}
+              className="p-6 flex flex-col gap-4"
+            >
+              {loginTab === "staff" && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                    เลือกชื่อของคุณในทีม
+                  </label>
+                  <select
+                    value={selectedLoginStaff}
+                    onChange={(e) => setSelectedLoginStaff(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all font-semibold text-gray-800 cursor-pointer"
+                  >
+                    {ALL_STAFF.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  {loginTab === "staff" ? "รหัสผ่านเจ้าหน้าที่ (รหัสคือ 1234)" : "รหัสผ่านแอดมิน"}
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                    <Lock className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="password"
+                    placeholder="กรอกรหัสผ่าน..."
+                    value={passwordInput}
+                    onChange={(e) => {
+                      setPasswordInput(e.target.value);
+                      if (passwordError) setPasswordError("");
+                    }}
+                    className={`w-full pl-10 pr-4 py-2.5 bg-gray-50 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all ${
+                      passwordError ? "border-red-300 focus:ring-red-500" : "border-gray-200"
+                    }`}
+                    autoFocus
+                  />
+                </div>
+                {passwordError && (
+                  <p className="text-red-500 text-xs font-semibold mt-1.5 flex items-center">
+                    <AlertCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
+                    {passwordError}
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-800 leading-relaxed font-bold">
+                <span className="font-bold">💡 ข้อมูลสิทธิ์การใช้งาน:</span>
+                <p className="mt-0.5 opacity-90 font-medium text-emerald-950">
+                  {loginTab === "staff" 
+                    ? "เมื่อล็อกอินสิทธิ์เจ้าหน้าที่ตามชื่อของตนเอง ท่านจะสามารถดูข้อมูล สลับ/แก้ไขตารางเวรในปฏิทินเฉพาะแถวที่เป็นชื่อของท่าน และส่งคำขอสลับเวรได้"
+                    : "สิทธิ์แอดมินช่วยให้ท่านแก้ไข สลับเวร พักร้อน และจัดการข้อมูลของเจ้าหน้าที่ทุกคนในทีมได้ทุกตาราง"
+                  }
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full mt-2 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Unlock className="w-4 h-4" />
+                <span>เข้าสู่ระบบ</span>
+              </button>
+            </form>
+          </motion.div>
+        </div>
+
+        <div className="p-4 text-center text-xs text-gray-400 font-bold">
+          © {new Date().getFullYear()} ShiftFlow Medical Checkup Report • แผนกพิมพ์ผล
+        </div>
+
+        {/* Floating Toasts */}
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+          <AnimatePresence>
+            {toasts.map((toast) => (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                className="bg-white border text-left border-emerald-100 rounded-xl shadow-2xl p-4 sm:p-5 max-w-sm flex items-start pointer-events-auto"
+              >
+                <div className="bg-emerald-100 p-2 rounded-full mr-3 shrink-0">
+                  <Bell className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="flex-1 pr-2">
+                  <h4 className="font-bold text-gray-900 text-sm flex items-center">
+                    วันที่ {toast.dateStr}
+                  </h4>
+                  <p className="text-gray-600 text-sm whitespace-pre-line mt-1.5 leading-relaxed">
+                    {toast.message}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-md transition-colors"
+                  aria-label="ปิดการแจ้งเตือน"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans pb-12 flex flex-col">
       <header className="bg-emerald-700 text-white p-4 shadow-md sticky top-0 z-30">
@@ -1972,6 +2187,9 @@ export default function App() {
               {(() => {
                 const activeStaff = selectedStaffFilter || currentUser || "อุษา";
                 const isGroup1 = GROUP_1.includes(activeStaff);
+                const vacDates = getStaffVacationDatesForYear(activeStaff, vacationTrackerYear);
+                const usedCount = vacDates.length;
+                const remainingCount = Math.max(0, 8 - usedCount);
                 
                 return (
                   <div className="flex items-center gap-4 z-10 w-full lg:w-auto">
@@ -1988,17 +2206,29 @@ export default function App() {
                       <h2 className="text-xl sm:text-2xl font-black mt-1 text-white truncate">
                         <span>คุณ{activeStaff}</span>
                       </h2>
+
+                      {/* Vacation summary badge */}
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap bg-white/10 border border-white/10 px-3 py-1.5 rounded-xl shadow-xs">
+                        <span className="text-[10px] text-amber-300 font-extrabold flex items-center gap-1">
+                          <Palmtree className="w-3.5 h-3.5" />
+                          <span>สถิติพักร้อนปี {vacationTrackerYear}:</span>
+                        </span>
+                        <span className="text-[11px] font-black">ใช้ไป {usedCount} วัน</span>
+                        <span className="text-[10px] text-emerald-300">•</span>
+                        <span className="text-[11px] font-black text-amber-200">คงเหลือ {remainingCount} วัน</span>
+                        <span className="text-[9px] text-emerald-100 font-bold bg-emerald-900/40 px-1.5 py-0.5 rounded-md">(โควตา 8 วัน)</span>
+                      </div>
                       
                       {/* Search / Select dropdown to check other staff */}
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-[10px] text-emerald-100 font-bold whitespace-nowrap">ตรวจสอบตารางของเพื่อน:</span>
                         <select
-                          value={activeStaff}
-                          onChange={(e) => {
-                            setSelectedStaffFilter(e.target.value);
-                            showToast(`กำลังตรวจสอบตารางของ คุณ${e.target.value}`, false, new Date().toLocaleDateString("th-TH"));
-                          }}
-                          className="bg-emerald-900/60 border border-emerald-600 rounded-xl px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer"
+                           value={activeStaff}
+                           onChange={(e) => {
+                             setSelectedStaffFilter(e.target.value);
+                             showToast(`กำลังตรวจสอบตารางของ คุณ${e.target.value}`, false, new Date().toLocaleDateString("th-TH"));
+                           }}
+                           className="bg-emerald-900/60 border border-emerald-600 rounded-xl px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer"
                         >
                           {ALL_STAFF.map(s => (
                             <option key={s} value={s} className="bg-emerald-800 text-white">คุณ{s}</option>
@@ -4405,7 +4635,13 @@ export default function App() {
 
                       return (
                         <React.Fragment key={staff}>
-                          <tr className={`hover:bg-gray-50/50 transition-colors ${isExpanded ? "bg-orange-50/20" : ""}`}>
+                          <tr className={`hover:bg-gray-50/50 transition-colors ${
+                            currentUser === staff 
+                              ? "bg-emerald-50/40 font-black border-l-4 border-emerald-500" 
+                              : isExpanded 
+                                ? "bg-orange-50/20" 
+                                : ""
+                          }`}>
                             <td className="p-3">
                               <div className="flex items-center gap-2">
                                 <span className={`w-2.5 h-2.5 rounded-full ${GROUP_1.includes(staff) ? "bg-amber-400" : "bg-emerald-400"}`} />
