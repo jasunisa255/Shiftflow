@@ -1734,11 +1734,11 @@ export default function App() {
 
   if (!currentUser && !isAdmin) {
     return (
-      <div className="min-h-screen bg-slate-50 text-gray-800 font-sans flex flex-col justify-between relative overflow-hidden">
-        {/* Decorative Background Elements */}
-        <div className="absolute top-0 left-0 w-full h-96 bg-emerald-700 -skew-y-6 origin-top-left -z-10 shadow-lg" />
-        <div className="absolute -bottom-48 -right-48 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl -z-10" />
-        <div className="absolute -top-12 -left-12 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl -z-10" />
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col justify-between relative overflow-hidden">
+        {/* Ambient Dark Mode Glowing Effects */}
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[50%] bg-emerald-500/5 rounded-full blur-[120px] -z-10" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[50%] bg-blue-500/5 rounded-full blur-[120px] -z-10" />
+        <div className="absolute top-[40%] left-[30%] w-[40%] h-[40%] bg-teal-500/5 rounded-full blur-[150px] -z-10" />
 
         <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
           <motion.div
@@ -1747,35 +1747,55 @@ export default function App() {
             transition={{ duration: 0.5 }}
             className="text-center text-white mb-8"
           >
-            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md inline-flex items-center justify-center mb-4 shadow-lg border border-white/20">
-              <Stethoscope className="w-10 h-10 text-white" />
+            {/* Phyathai 2 Official Logo Image Wrapper */}
+            <div className="relative group inline-block">
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl blur-md opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
+              <div className="relative w-24 h-24 bg-white p-2.5 rounded-3xl shadow-2xl flex items-center justify-center overflow-hidden border border-slate-800/20">
+                <img 
+                  src="https://graph.facebook.com/Phyathai2Hospital/picture?width=300&height=300" 
+                  alt="โรงพยาบาลพญาไท 2" 
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-contain rounded-2xl"
+                  onError={(e) => {
+                    // Fallback to beautiful custom inline SVG if blocked or offline
+                    (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23ffffff"/><path d="M50 15 C30 15 20 30 20 50 C20 70 35 85 50 85 C65 85 80 70 80 50 C80 30 70 15 50 15 Z" fill="none" stroke="%23047857" stroke-width="8"/><path d="M50 30 L50 70 M30 50 L70 50" stroke="%230284c7" stroke-width="10" stroke-linecap="round"/></svg>';
+                  }}
+                />
+              </div>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-wide drop-shadow-sm">
-              ShiftFlow Medical Checkup Report
-            </h1>
-            <p className="text-emerald-100/90 text-sm mt-1.5 font-bold">
-              ระบบบริหารจัดการตารางเวรและแจ้งเตือน แผนกพิมพ์ผล
-            </p>
+            
+            <div className="mt-4">
+              <span className="text-[10px] font-extrabold tracking-[0.25em] text-emerald-400 uppercase bg-emerald-950/80 px-3.5 py-1.5 rounded-full border border-emerald-800/40 shadow-inner">
+                PHYATHAI 2 HOSPITAL
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-3.5 drop-shadow-md">
+                โรงพยาบาลพญาไท 2
+              </h1>
+              <p className="text-slate-400 text-sm mt-1.5 font-bold flex items-center justify-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                ระบบบริหารจัดการตารางเวร แผนกพิมพ์ผล
+              </p>
+            </div>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1, duration: 0.4 }}
-            className="bg-white rounded-2xl shadow-2xl border border-gray-150 max-w-md w-full overflow-hidden text-left"
+            className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-slate-800/80 max-w-md w-full overflow-hidden text-left"
           >
-            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 text-white text-center relative">
-              <div className="bg-white/20 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
-                <Lock className="w-6 h-6 text-white" />
+            <div className="bg-gradient-to-r from-slate-950/80 to-slate-900/80 border-b border-slate-800/80 p-6 text-center relative">
+              <div className="bg-emerald-500/10 w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-emerald-500/20 shadow-inner">
+                <Lock className="w-5 h-5 text-emerald-400" />
               </div>
-              <h3 className="text-lg font-bold">กรุณาลงชื่อเข้าใช้งานระบบเพื่อดูข้อมูล</h3>
-              <p className="text-emerald-100 text-xs mt-1">
+              <h3 className="text-base font-extrabold text-white">กรุณาลงชื่อเข้าใช้งานเพื่อดูข้อมูล</h3>
+              <p className="text-slate-400 text-xs mt-1">
                 สำหรับเจ้าหน้าที่แผนกพิมพ์ผลและแอดมิน เพื่อความปลอดภัยของข้อมูลปฏิบัติงาน
               </p>
             </div>
 
             {/* Tabs for Login Type */}
-            <div className="flex border-b border-gray-100 bg-gray-50/50 p-1">
+            <div className="flex border-b border-slate-800 bg-slate-950/40 p-1.5">
               <button
                 type="button"
                 onClick={() => {
@@ -1783,13 +1803,13 @@ export default function App() {
                   setPasswordError("");
                   setPasswordInput("");
                 }}
-                className={`flex-1 py-3.5 text-xs sm:text-sm font-bold text-center transition-all cursor-pointer rounded-xl ${
+                className={`flex-1 py-3 text-xs sm:text-sm font-bold text-center transition-all cursor-pointer rounded-xl flex items-center justify-center gap-2 ${
                   loginTab === "staff"
-                    ? "bg-white text-emerald-800 shadow-sm border-b-2 border-emerald-600"
-                    : "text-gray-500 hover:text-gray-800"
+                    ? "bg-slate-800 text-emerald-400 shadow-md border border-slate-700/60"
+                    : "text-slate-500 hover:text-slate-300"
                 }`}
               >
-                👤 สิทธิ์เจ้าหน้าที่ในทีม (Staff)
+                👤 เจ้าหน้าที่ในทีม (Staff)
               </button>
               <button
                 type="button"
@@ -1798,13 +1818,13 @@ export default function App() {
                   setPasswordError("");
                   setPasswordInput("");
                 }}
-                className={`flex-1 py-3.5 text-xs sm:text-sm font-bold text-center transition-all cursor-pointer rounded-xl ${
+                className={`flex-1 py-3 text-xs sm:text-sm font-bold text-center transition-all cursor-pointer rounded-xl flex items-center justify-center gap-2 ${
                   loginTab === "admin"
-                    ? "bg-white text-amber-600 shadow-sm border-b-2 border-amber-500"
-                    : "text-gray-500 hover:text-gray-800"
+                    ? "bg-slate-800 text-amber-400 shadow-md border border-slate-700/60"
+                    : "text-slate-500 hover:text-slate-300"
                 }`}
               >
-                🛡️ สิทธิ์ผู้ดูแลระบบ (Admin)
+                🛡️ ผู้ดูแลระบบ (Admin)
               </button>
             </div>
 
@@ -1840,27 +1860,27 @@ export default function App() {
             >
               {loginTab === "staff" && (
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                     เลือกชื่อของคุณในทีม
                   </label>
                   <select
                     value={selectedLoginStaff}
                     onChange={(e) => setSelectedLoginStaff(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all font-semibold text-gray-800 cursor-pointer"
+                    className="w-full px-3 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none transition-all font-semibold text-slate-200 cursor-pointer"
                   >
                     {ALL_STAFF.map(s => (
-                      <option key={s} value={s}>{s}</option>
+                      <option key={s} value={s} className="bg-slate-900 text-slate-200">{s}</option>
                     ))}
                   </select>
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                   {loginTab === "staff" ? "รหัสผ่านเจ้าหน้าที่ (รหัสคือ 1234)" : "รหัสผ่านแอดมิน"}
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">
                     <Lock className="w-4 h-4" />
                   </span>
                   <input
@@ -1871,23 +1891,26 @@ export default function App() {
                       setPasswordInput(e.target.value);
                       if (passwordError) setPasswordError("");
                     }}
-                    className={`w-full pl-10 pr-4 py-2.5 bg-gray-50 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all ${
-                      passwordError ? "border-red-300 focus:ring-red-500" : "border-gray-200"
+                    className={`w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border rounded-xl text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none transition-all ${
+                      passwordError ? "border-rose-500/50 focus:ring-rose-500/10 animate-shake" : "border-slate-800"
                     }`}
                     autoFocus
                   />
                 </div>
                 {passwordError && (
-                  <p className="text-red-500 text-xs font-semibold mt-1.5 flex items-center">
+                  <p className="text-rose-400 text-xs font-semibold mt-1.5 flex items-center">
                     <AlertCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
                     {passwordError}
                   </p>
                 )}
               </div>
 
-              <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-800 leading-relaxed font-bold">
-                <span className="font-bold">💡 ข้อมูลสิทธิ์การใช้งาน:</span>
-                <p className="mt-0.5 opacity-90 font-medium text-emerald-950">
+              <div className="bg-emerald-950/20 border border-emerald-900/30 rounded-xl p-3.5 text-xs text-emerald-400 leading-relaxed font-bold">
+                <span className="font-bold flex items-center gap-1.5 text-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  💡 สิทธิ์การใช้งานตารางเวร:
+                </span>
+                <p className="mt-1 opacity-90 font-medium text-slate-300">
                   {loginTab === "staff" 
                     ? "เมื่อล็อกอินสิทธิ์เจ้าหน้าที่ตามชื่อของตนเอง ท่านจะสามารถดูข้อมูล สลับ/แก้ไขตารางเวรในปฏิทินเฉพาะแถวที่เป็นชื่อของท่าน และส่งคำขอสลับเวรได้"
                     : "สิทธิ์แอดมินช่วยให้ท่านแก้ไข สลับเวร พักร้อน และจัดการข้อมูลของเจ้าหน้าที่ทุกคนในทีมได้ทุกตาราง"
@@ -1897,7 +1920,7 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full mt-2 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full mt-2 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 active:from-emerald-700 active:to-teal-600 text-white font-extrabold rounded-xl text-sm transition-all shadow-lg shadow-emerald-950/30 flex items-center justify-center gap-1.5 cursor-pointer transform hover:scale-[1.01]"
               >
                 <Unlock className="w-4 h-4" />
                 <span>เข้าสู่ระบบ</span>
@@ -1906,8 +1929,8 @@ export default function App() {
           </motion.div>
         </div>
 
-        <div className="p-4 text-center text-xs text-gray-400 font-bold">
-          © {new Date().getFullYear()} ShiftFlow Medical Checkup Report • แผนกพิมพ์ผล
+        <div className="p-4 text-center text-xs text-slate-600 font-bold">
+          © {new Date().getFullYear()} ShiftFlow Medical Checkup Report • โรงพยาบาลพญาไท 2 • แผนกพิมพ์ผล
         </div>
 
         {/* Floating Toasts */}
@@ -1919,22 +1942,22 @@ export default function App() {
                 initial={{ opacity: 0, y: 30, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                className="bg-white border text-left border-emerald-100 rounded-xl shadow-2xl p-4 sm:p-5 max-w-sm flex items-start pointer-events-auto"
+                className="bg-slate-900 border text-left border-slate-800 rounded-xl shadow-2xl p-4 sm:p-5 max-w-sm flex items-start pointer-events-auto"
               >
-                <div className="bg-emerald-100 p-2 rounded-full mr-3 shrink-0">
-                  <Bell className="w-5 h-5 text-emerald-600" />
+                <div className="bg-emerald-500/10 p-2 rounded-full mr-3 shrink-0 border border-emerald-500/20">
+                  <Bell className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div className="flex-1 pr-2">
-                  <h4 className="font-bold text-gray-900 text-sm flex items-center">
+                  <h4 className="font-bold text-slate-100 text-sm flex items-center">
                     วันที่ {toast.dateStr}
                   </h4>
-                  <p className="text-gray-600 text-sm whitespace-pre-line mt-1.5 leading-relaxed">
+                  <p className="text-slate-400 text-sm whitespace-pre-line mt-1.5 leading-relaxed">
                     {toast.message}
                   </p>
                 </div>
                 <button
                   onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-md transition-colors"
+                  className="text-slate-500 hover:text-slate-300 hover:bg-slate-800 p-1 rounded-md transition-colors"
                   aria-label="ปิดการแจ้งเตือน"
                 >
                   <X className="w-4 h-4" />
