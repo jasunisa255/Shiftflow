@@ -30,7 +30,10 @@ import {
   Search,
   Filter,
   TrendingUp,
-  Sparkles
+  Sparkles,
+  Trash2,
+  CalendarRange,
+  CalendarPlus
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -49,6 +52,12 @@ const GROUP_2 = [
 const ALL_STAFF = [...GROUP_1, ...GROUP_2];
 const DISPLAY_ORDER = [...GROUP_2, ...GROUP_1];
 const FIRE_CODES_REST = ["A", "B", "C", "D"];
+
+interface Holiday {
+  date: string;
+  name: string;
+  type: "public" | "company";
+}
 
 interface DaySchedule {
   date: string;
@@ -343,6 +352,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     return localStorage.getItem("hospitalSchedule_isAdmin") === "true";
   });
+  const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<string | null>(() => {
     return localStorage.getItem("hospitalSchedule_currentUser");
   });
@@ -361,6 +371,41 @@ export default function App() {
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [isScheduleDirty, setIsScheduleDirty] = useState<boolean>(false);
+
+  const [holidays, setHolidays] = useState<Holiday[]>(() => {
+    const saved = localStorage.getItem("hospitalSchedule_holidays");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    const y = currentNow.getFullYear();
+    const m = String(currentNow.getMonth() + 1).padStart(2, '0');
+    return [
+      { date: `${y}-01-01`, name: "วันขึ้นปีใหม่", type: "public" },
+      { date: `${y}-04-13`, name: "วันสงกรานต์", type: "public" },
+      { date: `${y}-04-14`, name: "วันสงกรานต์", type: "public" },
+      { date: `${y}-04-15`, name: "วันสงกรานต์", type: "public" },
+      { date: `${y}-05-01`, name: "วันแรงงานแห่งชาติ", type: "public" },
+      { date: `${y}-06-03`, name: "วันเฉลิมพระชนมพรรษาสมเด็จพระนางเจ้าฯ พระบรมราชินี", type: "public" },
+      { date: `${y}-07-28`, name: "วันเฉลิมพระชนมพรรษา ร.10", type: "public" },
+      { date: `${y}-08-12`, name: "วันแม่แห่งชาติ", type: "public" },
+      { date: `${y}-10-13`, name: "วันคล้ายวันสวรรคต ร.9", type: "public" },
+      { date: `${y}-12-05`, name: "วันพ่อแห่งชาติ", type: "public" },
+      { date: `${y}-12-31`, name: "วันสิ้นปี", type: "public" },
+      // Company holidays
+      { date: `${y}-${m}-12`, name: "วันครบรอบบริษัท / Outing", type: "company" },
+      { date: `${y}-${m}-26`, name: "วันประชุมใหญ่บริษัท", type: "company" },
+    ];
+  });
+
+  const [newHolidayDate, setNewHolidayDate] = useState<string>("");
+  const [newHolidayName, setNewHolidayName] = useState<string>("");
+  const [newHolidayType, setNewHolidayType] = useState<"public" | "company">("public");
+
+  useEffect(() => {
+    localStorage.setItem("hospitalSchedule_holidays", JSON.stringify(holidays));
+  }, [holidays]);
 
   useEffect(() => {
     if (currentUser) {
@@ -561,7 +606,8 @@ export default function App() {
       const dayName = d.toLocaleDateString("th-TH", { weekday: "short" });
       const dateNum = d.getDate();
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      return { date: day.date, dayName, dateNum, isWeekend, obj: d };
+      const holiday = holidays.find((h: Holiday) => h.date === day.date);
+      return { date: day.date, dayName, dateNum, isWeekend, obj: d, holiday };
     });
 
   const getStaffStats = (staffName: string) => {
@@ -1279,6 +1325,37 @@ export default function App() {
     }, 8000);
   };
 
+  const handleAddHoliday = () => {
+    if (!isAdmin) {
+      showToast("เฉพาะ Admin เท่านั้นที่สามารถเพิ่มวันหยุดได้", false, new Date().toLocaleDateString("th-TH"));
+      return;
+    }
+    if (!newHolidayDate || !newHolidayName.trim()) {
+      showToast("กรุณากรอกข้อมูลวันหยุดให้ครบถ้วน", false, new Date().toLocaleDateString("th-TH"));
+      return;
+    }
+
+    // Check if duplicate date
+    const exists = holidays.some(h => h.date === newHolidayDate);
+    if (exists) {
+      showToast("❌ มีการกำหนดวันหยุดในวันที่เลือกนี้อยู่แล้ว", false, new Date().toLocaleDateString("th-TH"));
+      return;
+    }
+
+    const newH: Holiday = {
+      date: newHolidayDate,
+      name: newHolidayName.trim(),
+      type: newHolidayType
+    };
+
+    setHolidays(prev => [...prev, newH].sort((a, b) => a.date.localeCompare(b.date)));
+    showToast(`✨ เพิ่มวันหยุด "${newH.name}" เรียบร้อยแล้ว`, false, new Date().toLocaleDateString("th-TH"));
+    
+    // Clear form
+    setNewHolidayDate("");
+    setNewHolidayName("");
+  };
+
   const handleAutoScheduleDoc = () => {
     if (!isAdmin) {
       showToast("เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถจัดเวร Doc อัตโนมัติได้", false, new Date().toLocaleDateString("th-TH"));
@@ -1644,8 +1721,1039 @@ export default function App() {
       </header>
 
       <main className="w-full flex-1 p-2 sm:p-4 md:px-6 lg:px-8 flex flex-col gap-6 mt-2">
-        {/* Toggle View Mode for Mobile vs Desktop */}
-        <div className="flex bg-white/90 backdrop-blur border border-emerald-100/50 p-1 rounded-2xl shadow-sm gap-1 w-full max-w-lg mx-auto">
+        {/* Toggle between Staff Portal and Admin Controls */}
+        {isAdmin && (
+          <div className="flex flex-col sm:flex-row bg-white/95 backdrop-blur border-2 border-amber-200 p-3 rounded-2xl shadow-md gap-3 w-full max-w-3xl mx-auto items-center justify-between text-left">
+            <div className="flex items-center gap-2.5">
+              <Shield className="w-5 h-5 text-amber-500 animate-pulse shrink-0" />
+              <div>
+                <span className="text-xs font-black text-gray-800 block">แผงควบคุมสิทธิ์ผู้ดูแลระบบ (Admin Control Board)</span>
+                <span className="text-[10px] text-gray-500 font-bold block">สลับโหมดการทำงานเพื่อเข้าถึงตารางใหญ่ รายงานวิเคราะห์ชีท และจัดการระบบวันหยุด</span>
+              </div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={() => setIsAdminConsoleOpen(false)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  !isAdminConsoleOpen
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <User className="w-4 h-4 text-inherit" />
+                <span>👤 หน้าจอพนักงาน (Staff Portal)</span>
+              </button>
+              <button
+                onClick={() => setIsAdminConsoleOpen(true)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  isAdminConsoleOpen
+                    ? "bg-amber-500 text-white shadow-sm"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <Settings className="w-4 h-4 text-inherit" />
+                <span>🛠️ จัดการระบบ (Admin Console)</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isAdminConsoleOpen ? (
+          /* ======================================================= */
+          /*   1. UNIFIED SINGLE SCREEN STAFF PORTAL                 */
+          /* ======================================================= */
+          <div className="w-full max-w-7xl mx-auto flex flex-col gap-6">
+            {/* 👤 PROMINENT USER & DATE FOCUS BOARD */}
+            <div className="bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-850 rounded-3xl p-5 sm:p-6 shadow-xl border border-emerald-600/40 text-white flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative overflow-hidden text-left">
+              {/* Decorative backgrounds */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-500/10 rounded-full blur-2xl -ml-20 -mb-20 pointer-events-none" />
+
+              {/* USER PROFILE INFO */}
+              {(() => {
+                const activeStaff = selectedStaffFilter || currentUser || "อุษา";
+                const isGroup1 = GROUP_1.includes(activeStaff);
+                
+                return (
+                  <div className="flex items-center gap-4 z-10 w-full lg:w-auto">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 text-emerald-950 font-black text-xl flex items-center justify-center shadow-lg border-2 border-white shrink-0">
+                      {activeStaff.substring(0, 2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] uppercase font-black tracking-widest text-emerald-300">พนักงานผู้ใช้งาน</span>
+                        <span className="text-[9px] bg-white/20 border border-white/20 px-2 py-0.5 rounded-full font-bold text-white">
+                          {isGroup1 ? "กลุ่มหยุด ส.-อา." : "กลุ่มเวรปกติหมุนเวียน"}
+                        </span>
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-black mt-1 text-white truncate">
+                        <span>คุณ{activeStaff}</span>
+                      </h2>
+                      
+                      {/* Search / Select dropdown to check other staff */}
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-[10px] text-emerald-100 font-bold whitespace-nowrap">ตรวจสอบตารางของเพื่อน:</span>
+                        <select
+                          value={activeStaff}
+                          onChange={(e) => {
+                            setSelectedStaffFilter(e.target.value);
+                            showToast(`กำลังตรวจสอบตารางของ คุณ${e.target.value}`, false, new Date().toLocaleDateString("th-TH"));
+                          }}
+                          className="bg-emerald-900/60 border border-emerald-600 rounded-xl px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer"
+                        >
+                          {ALL_STAFF.map(s => (
+                            <option key={s} value={s} className="bg-emerald-800 text-white">คุณ{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* DATE FOCUS */}
+              <div className="flex flex-col items-start lg:items-end gap-2 w-full lg:w-auto z-10">
+                <span className="text-[10px] uppercase font-black tracking-widest text-emerald-300">วันที่กำลังตรวจสอบ (Selected Date)</span>
+                <div className="bg-white/10 backdrop-blur-md border border-white/25 px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-inner">
+                  <CalendarDays className="w-5 h-5 text-amber-400 shrink-0" />
+                  <span className="text-sm sm:text-base font-black tracking-wide">
+                    {new Date(selectedDate).toLocaleDateString("th-TH", { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  </span>
+                </div>
+                
+                {/* Date Picker Input */}
+                <div className="flex items-center gap-2 mt-1 w-full lg:w-auto justify-start lg:justify-end">
+                  <span className="text-[10px] text-emerald-100 font-bold">เลือกวันที่อื่น:</span>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSelectedDate(e.target.value);
+                        const [y, m] = e.target.value.split('-');
+                        setCurrentMonthStr(`${y}-${m}`);
+                      }
+                    }}
+                    className="bg-emerald-900/60 border border-emerald-600 rounded-xl px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer shadow-sm text-center"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Touch-scrollable day tape navigator */}
+            <div className="bg-white rounded-2xl p-4 border border-emerald-100/50 shadow-xs flex flex-col gap-2 text-left">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">เลื่อนแถบเพื่อเลือกวันที่สะดวกรวดเร็ว (Day Tape Navigator):</span>
+              <div className="flex gap-2 overflow-x-auto py-1 custom-scrollbar w-full pb-2 scroll-smooth">
+                {datesInMonth.map((d) => {
+                  const isSelected = selectedDate === d.date;
+                  const hasHoliday = d.holiday;
+                  const activeStaff = selectedStaffFilter || currentUser || "อุษา";
+                  const isStaffOnDuty = schedule[d.date]?.workingStaff.includes(activeStaff);
+                  const isStaffOnVacation = schedule[d.date]?.vacationStaff?.includes(activeStaff);
+
+                  let tapeClass = "";
+                  if (isSelected) {
+                    tapeClass = "bg-emerald-600 text-white shadow-md font-bold scale-105 ring-2 ring-offset-2 ring-emerald-500";
+                  } else if (isStaffOnDuty) {
+                    tapeClass = "bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 ring-1 ring-emerald-400/30";
+                  } else if (isStaffOnVacation) {
+                    tapeClass = "bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-200";
+                  } else if (hasHoliday) {
+                    if (hasHoliday.type === "public") {
+                      tapeClass = "bg-amber-100/70 hover:bg-amber-200 text-amber-800 border border-amber-200";
+                    } else {
+                      tapeClass = "bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200";
+                    }
+                  } else if (d.isWeekend) {
+                    tapeClass = "bg-gray-100/70 hover:bg-gray-200/80 text-gray-700 border border-gray-200/60";
+                  } else {
+                    tapeClass = "bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-100";
+                  }
+
+                  return (
+                    <button
+                      key={d.date}
+                      onClick={() => setSelectedDate(d.date)}
+                      className={`flex flex-col items-center justify-center p-2 rounded-xl min-w-[54px] transition-all shrink-0 cursor-pointer relative ${tapeClass}`}
+                      title={hasHoliday ? `${hasHoliday.name} (${hasHoliday.type === 'public' ? 'วันหยุดนักขัตฤกษ์' : 'วันหยุดบริษัท'})` : ""}
+                    >
+                      <span className="text-[8px] uppercase tracking-wider font-bold opacity-85">{d.dayName}</span>
+                      <span className="text-sm font-black mt-0.5 flex items-center justify-center gap-0.5">
+                        {d.dateNum}
+                        {isStaffOnDuty && <span className="w-1 h-1 rounded-full bg-emerald-600 absolute bottom-1"></span>}
+                        {isStaffOnVacation && <span className="w-1 h-1 rounded-full bg-orange-500 absolute bottom-1"></span>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 📋 ตารางรวมของทั้งแผนก (Prominent Department-wide Schedule Table) */}
+            <section id="department-schedule-table" className="w-full bg-white rounded-3xl shadow-lg border-2 border-emerald-100/80 overflow-hidden flex flex-col min-h-[500px]">
+              {/* Header section with styling and actions */}
+              <div className="p-5 sm:p-6 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    <h2 className="text-lg sm:text-2xl font-black text-white flex items-center gap-2">
+                      <CalendarDays className="w-6 h-6 text-amber-300" />
+                      <span>ตารางปฏิบัติงานรวมทั้งแผนก ประจำเดือน</span>
+                    </h2>
+                  </div>
+                  <p className="text-emerald-100/90 text-xs sm:text-sm mt-1 font-medium">
+                    รายชื่อและเวรปฏิบัติการของเจ้าหน้าที่ทั้งหมด 14 ท่าน ตรวจสอบเวรสะดวกรวดเร็ว แยกวันเสาร์สีม่วง 🟣 วันอาทิตย์สีแดง 🔴 ชัดเจน
+                  </p>
+                </div>
+                
+                {/* Control elements */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20">
+                    <span className="text-xs font-bold text-emerald-100">เลือกเดือน:</span>
+                    <input 
+                      type="month" 
+                      value={currentMonthStr} 
+                      onChange={(e) => {
+                        if (e.target.value) setCurrentMonthStr(e.target.value);
+                      }}
+                      className="bg-emerald-900/40 text-white text-xs font-bold border border-emerald-500/30 rounded-lg px-2 py-1 focus:ring-1 focus:ring-emerald-300 focus:outline-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Filter / Search inside table */}
+                  <div className="relative w-full sm:w-48">
+                    <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-emerald-300 pointer-events-none">
+                      <Search className="w-3.5 h-3.5" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="ค้นหาชื่อเจ้าหน้าที่..."
+                      value={filterSearchQuery}
+                      onChange={(e) => setFilterSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-7 py-1.5 bg-white/15 text-white placeholder-emerald-200/70 text-xs rounded-xl border border-white/10 focus:bg-white focus:text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all font-semibold"
+                    />
+                    {filterSearchQuery && (
+                      <button
+                        onClick={() => setFilterSearchQuery("")}
+                        className="absolute inset-y-0 right-0 pr-2 flex items-center text-emerald-300 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Export button */}
+                  <button 
+                    onClick={handleExportExcel} 
+                    className="flex items-center text-xs font-bold bg-amber-400 text-emerald-950 px-3.5 py-1.5 rounded-xl hover:bg-amber-300 transition-all shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1" /> ส่งออก Excel
+                  </button>
+                </div>
+              </div>
+
+              {/* Legend & warnings bar */}
+              <div className="p-3 sm:px-5 bg-emerald-50/50 border-b border-emerald-100/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[10px] sm:text-xs font-bold text-emerald-950">
+                  <span className="flex items-center"><Check className="w-3.5 h-3.5 text-emerald-600 mr-1"/> ขึ้นเวร (WORK)</span>
+                  <span className="flex items-center"><X className="w-3.5 h-3.5 text-red-500 mr-1"/> หยุด (OFF)</span>
+                  <span className="flex items-center"><span className="text-[10px] font-black text-orange-600 bg-orange-50 px-1 rounded border border-orange-100 mr-1">V</span> พักร้อน (VAC)</span>
+                  <span className="flex items-center"><span className="text-[9px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-1 rounded mr-1">Doc.</span> ตรวจเอกสาร</span>
+                  <span className="flex items-center"><span className="text-[9px] font-black text-red-600 bg-red-50 border border-red-200 px-1 rounded mr-1">A..I</span> เวรดับเพลิง</span>
+                  <span className="flex items-center"><span className="text-[9px] font-black text-sky-700 bg-sky-50 border border-sky-200 px-1 rounded mr-1">📞 3551</span> สายหลัก</span>
+                  <span className="flex items-center"><span className="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-1 rounded mr-1">📞 3552</span> สายรอง</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] sm:text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-150 px-2 py-0.5 rounded-lg">
+                    💡 คลิกช่องวันของคุณเพื่อสลับสถานะเวรได้ทันที
+                  </span>
+                </div>
+              </div>
+
+              {/* Table Container with Custom Scrollbar */}
+              <div className="overflow-auto max-h-[75vh] flex-1 custom-scrollbar w-full">
+                <table className="w-full border-collapse text-sm min-w-max">
+                  <thead>
+                    <tr>
+                      <th className="bg-emerald-800 border-b-2 border-emerald-900 text-white p-3 font-bold text-left sticky top-0 left-0 z-40 min-w-[150px] sm:min-w-[190px] shadow-[3px_0_6px_rgba(0,0,0,0.15)] text-xs sm:text-sm">
+                        รายชื่อเจ้าหน้าที่ (14 คน)
+                      </th>
+                      {datesInMonth.map((d) => {
+                        const dayData = schedule[d.date];
+                        const workingG2Count = dayData ? dayData.workingStaff.filter(s => GROUP_2.includes(s)).length : 0;
+                        const offG2Count = 9 - workingG2Count;
+                        const isExcessiveOff = offG2Count > 4;
+                        const hasHoliday = d.holiday;
+                        const dayOfWeek = d.obj.getDay();
+
+                        // 🟣 SATURDAY (getDay === 6) & 🔴 SUNDAY (getDay === 0) STYLING REQUEST
+                        let headerBg = "bg-emerald-700 text-white";
+                        if (dayOfWeek === 6) {
+                          headerBg = "bg-purple-600 text-white"; // Saturday Purple
+                        } else if (dayOfWeek === 0) {
+                          headerBg = "bg-red-600 text-white"; // Sunday Red
+                        }
+
+                        if (hasHoliday) {
+                          if (hasHoliday.type === "public") {
+                            headerBg = "bg-amber-500 text-white";
+                          } else {
+                            headerBg = "bg-rose-500 text-white";
+                          }
+                        }
+
+                        let headerTitle = "";
+                        if (hasHoliday) {
+                          headerTitle += `[วันหยุด: ${hasHoliday.name} (${hasHoliday.type === "public" ? "นักขัตฤกษ์" : "บริษัท"})] `;
+                        }
+                        if (isExcessiveOff) {
+                          headerTitle += `เตือนภัย: วันนี้มีทีมหยุดเกิน 4 คน! (หยุด ${offG2Count} คน จาก 9 คน)`;
+                        }
+
+                        return (
+                          <th
+                            key={d.date}
+                            className={`p-1 sm:p-2 min-w-[42px] sm:min-w-[46px] lg:min-w-[50px] border-l border-emerald-500/20 text-center relative sticky top-0 z-30 ${headerBg} ${isExcessiveOff ? "ring-2 ring-rose-500 ring-inset" : ""}`}
+                            title={headerTitle || undefined}
+                          >
+                            <div className="text-[8px] sm:text-[10px] font-black opacity-90 tracking-wider uppercase">
+                              {d.dayName}
+                            </div>
+                            <div className="font-extrabold text-xs sm:text-base mt-0.5 relative inline-block">
+                              {d.dateNum}
+                              {isExcessiveOff && (
+                                <span className="absolute -top-1 -right-2 text-rose-300 text-[10px] font-black animate-pulse" title="หยุดเกิน 4 คน!">
+                                  ⚠️
+                                </span>
+                              )}
+                              {hasHoliday && (
+                                <span
+                                  className="absolute bottom-[-2px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-white animate-pulse"
+                                  title={hasHoliday.name}
+                                />
+                              )}
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const activeSpotlightStaff = selectedStaffFilter || currentUser;
+                      
+                      // Support searching/filtering row names
+                      const filteredDisplayOrder = DISPLAY_ORDER.filter(staff => {
+                        if (!filterSearchQuery) return true;
+                        return staff.toLowerCase().includes(filterSearchQuery.toLowerCase());
+                      });
+
+                      const listToRender = (isolateStaffRow && activeSpotlightStaff)
+                        ? filteredDisplayOrder.filter(s => s === activeSpotlightStaff)
+                        : filteredDisplayOrder;
+
+                      if (listToRender.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={datesInMonth.length + 1} className="py-8 text-center text-sm font-semibold text-gray-400 italic bg-gray-50/50">
+                              🔍 ไม่พบรายชื่อเจ้าหน้าที่ที่ตรงกับการค้นหา
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return listToRender.map((staff) => {
+                        const idx = DISPLAY_ORDER.indexOf(staff);
+                        const isStartOfGroup1 = idx === GROUP_2.length && !(isolateStaffRow && activeSpotlightStaff) && !filterSearchQuery;
+                        
+                        const isFocused = activeSpotlightStaff === staff;
+                        const hasAnyFocus = !!activeSpotlightStaff;
+                        
+                        let rowClass = "transition-all duration-200 ";
+                        if (isFocused) {
+                          rowClass += "bg-emerald-100/70 hover:bg-emerald-150/80 shadow-[inset_4px_0_0_0_#10b981] font-bold ring-1 ring-emerald-500/20";
+                        } else if (hasAnyFocus) {
+                          rowClass += "opacity-35 hover:opacity-100 " + (idx % 2 === 0 ? "bg-white" : "bg-emerald-50/10");
+                        } else {
+                          rowClass += idx % 2 === 0 ? "bg-white" : "bg-emerald-50/30";
+                        }
+
+                        return (
+                          <React.Fragment key={staff}>
+                            {isStartOfGroup1 && (
+                              <tr>
+                                <td colSpan={datesInMonth.length + 1} className="bg-emerald-100/50 font-bold text-emerald-800 p-2 text-[11px] sm:text-xs text-center border-y border-emerald-200/60 shadow-inner">
+                                  --- กลุ่มเจ้าหน้าที่หยุดเสาร์-อาทิตย์ ---
+                                </td>
+                              </tr>
+                            )}
+                            <tr className={rowClass}>
+                              <td className="p-2 sm:p-3 border-b border-emerald-100 sticky left-0 bg-inherit shadow-[2px_0_4px_rgba(0,0,0,0.05)] z-10 font-bold text-emerald-950 border-r border-r-emerald-100 group text-xs sm:text-sm">
+                                <div className="flex items-center justify-between">
+                                  <span className="truncate pr-1">{staff}</span>
+                                  {GROUP_1.includes(staff) && (
+                                    <span className="text-[8px] sm:text-[9px] bg-purple-150 text-purple-700 font-extrabold px-1.5 py-0.5 rounded ml-1 whitespace-nowrap">หยุด ส.-อา.</span>
+                                  )}
+                                </div>
+                              </td>
+                              {datesInMonth.map((d) => {
+                                const dayData = schedule[d.date];
+                                const isWorking = dayData?.workingStaff.includes(staff);
+                                const isVacation = dayData?.vacationStaff?.includes(staff);
+                                const isDocInCharge = dayData?.docInCharge === staff;
+                                const isPhone3551 = dayData?.phone3551 === staff;
+                                const isPhone3552 = dayData?.phone3552 === staff;
+                                const fireCode = dayData?.fireCodes[staff];
+
+                                // Background column indicator highlights
+                                let cellBg = "";
+                                if (d.holiday) {
+                                  cellBg = d.holiday.type === "public" ? "bg-amber-50/40" : "bg-rose-50/30";
+                                } else if (d.obj.getDay() === 6) { // Sat columns
+                                  cellBg = "bg-purple-50/15";
+                                } else if (d.obj.getDay() === 0) { // Sun columns
+                                  cellBg = "bg-red-50/15";
+                                }
+
+                                return (
+                                  <td
+                                    key={d.date}
+                                    onClick={() => toggleCellState(d.date, staff)}
+                                    title={d.holiday ? `${d.holiday.name} (${d.holiday.type === 'public' ? 'วันหยุดนักขัตฤกษ์' : 'วันหยุดบริษัท'})` : undefined}
+                                    className={`p-0.5 sm:p-1 border-b border-l border-emerald-100/60 text-center relative cursor-pointer transition-colors ${cellBg} ${
+                                      isAdmin ? "hover:bg-emerald-100/60" : "hover:bg-amber-100/40"
+                                    }`}
+                                  >
+                                    {isVacation ? (
+                                      <div className="flex items-center justify-center min-h-[36px] sm:min-h-[46px]">
+                                        <span className="text-xs sm:text-sm font-black text-orange-500 select-none pointer-events-none">
+                                          V
+                                        </span>
+                                      </div>
+                                    ) : isWorking ? (
+                                      <div className="flex flex-col items-center justify-center min-h-[36px] sm:min-h-[46px] gap-0.5 pointer-events-none">
+                                        <Check
+                                          strokeWidth={4.5}
+                                          className="w-[12px] h-[12px] sm:w-[15px] sm:h-[15px] text-emerald-600"
+                                        />
+                                        {isDocInCharge && (
+                                          <span className="text-[7.5px] sm:text-[8.5px] font-black text-blue-800 bg-blue-100 border border-blue-200 px-0.5 py-[0.5px] rounded leading-none shadow-sm select-none">
+                                            Doc.
+                                          </span>
+                                        )}
+                                        {isPhone3551 && (
+                                          <span className="text-[7px] sm:text-[8px] font-black text-sky-800 bg-sky-100 border border-sky-200 px-0.5 py-[0.5px] rounded leading-none shadow-sm select-none flex items-center">
+                                            <PhoneCall className="w-[7px] h-[7px] sm:w-[9px] sm:h-[9px] mr-0.5" /> 3551
+                                          </span>
+                                        )}
+                                        {isPhone3552 && (
+                                          <span className="text-[7px] sm:text-[8px] font-black text-indigo-800 bg-indigo-100 border border-indigo-200 px-0.5 py-[0.5px] rounded leading-none shadow-sm select-none flex items-center">
+                                            <PhoneCall className="w-[7px] h-[7px] sm:w-[9px] sm:h-[9px] mr-0.5" /> 3552
+                                          </span>
+                                        )}
+                                        {fireCode && (
+                                          <span className="text-[8px] font-black text-red-600 bg-red-100 border border-red-200 px-0.5 py-[0.5px] rounded leading-none shadow-sm select-none">
+                                            {fireCode}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-col items-center justify-center min-h-[36px] sm:min-h-[46px] pointer-events-none">
+                                        <X strokeWidth={3} className="w-[11px] h-[11px] sm:w-[14px] sm:h-[14px] text-red-400 opacity-60" />
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* DUAL COLUMN SYSTEM LAYOUT */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              
+              {/* ================= COLUMN 1 (LEFT - 60%): TODAY'S WORK & ROLES ================= */}
+              <div className="lg:col-span-7 flex flex-col gap-6">
+                
+                {/* DAILY PERSONAL STATUS BOX */}
+                {(() => {
+                  const activeStaff = selectedStaffFilter || currentUser || "อุษา";
+                  const dayData = schedule[selectedDate];
+                  const isWorking = dayData?.workingStaff.includes(activeStaff);
+                  const isVacation = dayData?.vacationStaff?.includes(activeStaff);
+                  const isPhone1 = dayData?.phone3551 === activeStaff;
+                  const isPhone2 = dayData?.phone3552 === activeStaff;
+                  const isDoc = dayData?.docInCharge === activeStaff;
+                  const fireCode = dayData?.fireCodes[activeStaff];
+
+                  let cardColor = "bg-white border-gray-100 text-gray-800";
+                  let badge = null;
+                  let message = "";
+                  let detail = "";
+
+                  if (isWorking) {
+                    cardColor = "bg-emerald-50/70 border-emerald-200 text-emerald-950";
+                    badge = <span className="px-3 py-1 bg-emerald-600 text-white text-[10px] sm:text-xs font-black rounded-full shadow-sm">🟢 วันนี้คุณมีเวรปฏิบัติงาน</span>;
+                    message = "วันนี้ท่านมีตารางเวรขึ้นปฏิบัติหน้าที่ในแผนก";
+                    
+                    const roles = [];
+                    if (isPhone1) roles.push("📞 สายด่วนหลัก 3551");
+                    if (isPhone2) roles.push("📞 สายด่วนรอง 3552");
+                    if (isDoc) roles.push("📝 In-charge เอกสาร Doc");
+                    if (fireCode) roles.push(`🚒 รหัสรับมืออัคคีภัย: ${fireCode}`);
+                    
+                    detail = roles.length > 0 ? `บทบาทของคุณวันนี้: ${roles.join(" | ")}` : "หน้าที่: เจ้าหน้าที่พิมพ์ผลเวรทั่วไป";
+                  } else if (isVacation) {
+                    cardColor = "bg-orange-50/70 border-orange-200 text-orange-950";
+                    badge = <span className="px-3 py-1 bg-orange-600 text-white text-[10px] sm:text-xs font-black rounded-full shadow-sm">🌴 วันนี้คุณลาพักร้อน</span>;
+                    message = "คุณอยู่ในสิทธิ์การลาพักร้อนประจำรอบเดือน";
+                    detail = "ได้รับการยืนยันการลาในตารางระบบเรียบร้อยแล้ว";
+                  } else {
+                    cardColor = "bg-sky-50/50 border-sky-100 text-sky-950";
+                    badge = <span className="px-3 py-1 bg-sky-600 text-white text-[10px] sm:text-xs font-black rounded-full shadow-sm">🔵 วันนี้คุณได้หยุดพักเวร</span>;
+                    message = "วันนี้ท่านไม่มีเวร มีสิทธิ์หยุดปฏิบัติงานตามปกติ";
+                    detail = "พักผ่อนเพื่อสุขภาพที่ดีของคุณ!";
+                  }
+
+                  return (
+                    <div className={`rounded-2xl p-5 border shadow-xs transition-all ${cardColor} flex flex-col gap-3 relative text-left`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-gray-400">สถานะเวรรายวันส่วนตัว</span>
+                        {badge}
+                      </div>
+                      <h3 className="text-lg font-black">{message}</h3>
+                      <p className="text-sm font-bold opacity-85">{detail}</p>
+                    </div>
+                  );
+                })()}
+
+                {/* MAIN KEY DUTIES TODAY */}
+                {(() => {
+                  const dayData = schedule[selectedDate] || {};
+                  return (
+                    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100/50 shadow-sm flex flex-col gap-4 text-left">
+                      <h3 className="text-xs sm:text-sm font-bold text-gray-700 flex items-center gap-1.5 border-b border-gray-150 pb-2">
+                        <User className="w-4 h-4 text-emerald-600" />
+                        <span>ผู้รับผิดชอบเวรพิเศษของแผนกวันนี้</span>
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="bg-sky-50/50 border border-sky-100 rounded-xl p-3 flex flex-col">
+                          <span className="text-[10px] font-black text-sky-700 block">สายด่วนหลัก (3551)</span>
+                          <span className="text-sm font-black text-sky-900 mt-1 truncate">{dayData.phone3551 || "ไม่มีผู้รับสาย"}</span>
+                          <span className="text-[9px] text-gray-400 mt-0.5">รับเรื่องรายงานผลด่วนหลัก</span>
+                        </div>
+                        <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex flex-col">
+                          <span className="text-[10px] font-black text-indigo-700 block">สายด่วนรอง (3552)</span>
+                          <span className="text-sm font-black text-indigo-900 mt-1 truncate">{dayData.phone3552 || "ไม่มีผู้รับสาย"}</span>
+                          <span className="text-[9px] text-gray-400 mt-0.5">รับสายสำรองรายงาน</span>
+                        </div>
+                        <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-3 flex flex-col">
+                          <span className="text-[10px] font-black text-purple-700 block">In-charge เอกสาร Doc</span>
+                          <span className="text-sm font-black text-purple-900 mt-1 truncate">{dayData.docInCharge || "ไม่มี"}</span>
+                          <span className="text-[9px] text-gray-400 mt-0.5">บันทึกรายงานรับตรวจสอบ</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* TEAM MEMBERS ON DUTY TODAY */}
+                {(() => {
+                  const dayData = schedule[selectedDate] || { workingStaff: [], vacationStaff: [] };
+                  const activeWorking = dayData.workingStaff || [];
+                  const activeVacation = dayData.vacationStaff || [];
+                  const activeOff = ALL_STAFF.filter(s => !activeWorking.includes(s) && !activeVacation.includes(s));
+
+                  return (
+                    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100/50 shadow-sm flex flex-col gap-5 text-left">
+                      {/* Section 1: Working Staff */}
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-emerald-800 flex items-center gap-1.5 border-b border-emerald-50 pb-2 mb-3">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span>เพื่อนร่วมทีมขึ้นเวรร่วมกันวันนี้ ({activeWorking.length} คน)</span>
+                        </h4>
+                        
+                        {activeWorking.length === 0 ? (
+                          <div className="py-4 text-center text-xs text-gray-400 italic">ไม่มีผู้ขึ้นเวรในวันนี้</div>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {activeWorking.map(staff => {
+                              const isPhone1 = dayData.phone3551 === staff;
+                              const isPhone2 = dayData.phone3552 === staff;
+                              const isDoc = dayData.docInCharge === staff;
+                              const fireCode = dayData.fireCodes?.[staff];
+                              
+                              return (
+                                <div key={staff} className="bg-emerald-50/30 border border-emerald-100/50 p-2.5 rounded-xl flex flex-col justify-between gap-1 shadow-2xs">
+                                  <div className="flex items-center gap-1.5 justify-between">
+                                    <span className="text-xs font-black text-emerald-950 truncate">{staff}</span>
+                                    {GROUP_1.includes(staff) && <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded font-black shrink-0">ส.-อา.</span>}
+                                  </div>
+                                  <div className="flex flex-wrap gap-0.5 mt-1">
+                                    {isPhone1 && <span className="text-[8px] font-black bg-sky-100 text-sky-800 border border-sky-200 px-1 rounded-sm">📞 3551</span>}
+                                    {isPhone2 && <span className="text-[8px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200 px-1 rounded-sm">📞 3552</span>}
+                                    {isDoc && <span className="text-[8px] font-black bg-purple-100 text-purple-800 border border-purple-200 px-1 rounded-sm">📝 Doc</span>}
+                                    {fireCode && <span className="text-[8px] font-black bg-red-100 text-red-800 border border-red-200 px-1 rounded-sm">🚒 {fireCode}</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 2: Off-duty and Vacation Staff */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                        {/* Off duty */}
+                        <div>
+                          <h4 className="text-xs font-bold text-sky-800 flex items-center gap-1.5 border-b border-sky-50 pb-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                            <span>ได้รับสิทธิ์หยุดวันนี้ ({activeOff.length} คน)</span>
+                          </h4>
+                          <div className="flex flex-wrap gap-1.5">
+                            {activeOff.map(s => (
+                              <span key={s} className="inline-flex text-[10px] font-bold bg-gray-50 text-gray-600 border border-gray-150 px-2 py-0.5 rounded-full">
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Vacation */}
+                        <div>
+                          <h4 className="text-xs font-bold text-orange-800 flex items-center gap-1.5 border-b border-orange-50 pb-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+                            <span>ลาพักร้อนวันนี้ ({activeVacation.length} คน)</span>
+                          </h4>
+                          <div className="flex flex-wrap gap-1.5">
+                            {activeVacation.length === 0 ? (
+                              <span className="text-[10px] text-gray-400 italic">ไม่มีผู้ลาพักร้อนวันนี้</span>
+                            ) : (
+                              activeVacation.map(s => (
+                                <span key={s} className="inline-flex text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-100 px-2 py-0.5 rounded-full">
+                                  {s}
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+              </div>
+
+              {/* ================= COLUMN 2 (RIGHT - 40%): MONTHLY PLANNER & SWAP ================= */}
+              <div className="lg:col-span-5 flex flex-col gap-6">
+                
+                {/* INTERACTIVE COMPACT MONTH CALENDAR */}
+                {(() => {
+                  const activeStaff = selectedStaffFilter || currentUser || "อุษา";
+                  const [yStr, mStr] = currentMonthStr.split('-');
+                  const yearVal = parseInt(yStr);
+                  const monthVal = parseInt(mStr) - 1;
+                  const firstDayOfWeek = new Date(yearVal, monthVal, 1).getDay();
+                  const padCells = Array(firstDayOfWeek).fill(null);
+                  const allCalendarCells = [...padCells, ...datesInMonth];
+
+                  return (
+                    <div className="bg-white rounded-2xl p-4 border border-emerald-100/50 shadow-sm flex flex-col gap-3 text-left">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <h3 className="text-xs sm:text-sm font-bold text-gray-700 flex items-center gap-1.5">
+                          <CalendarDays className="w-4 h-4 text-emerald-600" />
+                          <span>ปฏิทินเวรของ คุณ{activeStaff}</span>
+                        </h3>
+                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
+                          {new Date(`${currentMonthStr}-01`).toLocaleDateString("th-TH", { month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+
+                      {/* 7-column grid */}
+                      <div className="grid grid-cols-7 gap-1 text-center">
+                        {["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map((hd, index) => (
+                          <span key={index} className={`text-[10px] font-black py-1 ${index === 0 || index === 6 ? 'text-rose-500' : 'text-gray-400'}`}>
+                            {hd}
+                          </span>
+                        ))}
+
+                        {allCalendarCells.map((d, index) => {
+                          if (!d) return <div key={`pad-${index}`} className="p-1" />;
+                          
+                          const isSelected = selectedDate === d.date;
+                          const hasHoliday = d.holiday;
+                          const isWorking = schedule[d.date]?.workingStaff.includes(activeStaff);
+                          const isVacation = schedule[d.date]?.vacationStaff?.includes(activeStaff);
+                          const isPhone1 = schedule[d.date]?.phone3551 === activeStaff;
+                          const isPhone2 = schedule[d.date]?.phone3552 === activeStaff;
+                          const isDoc = schedule[d.date]?.docInCharge === activeStaff;
+
+                          let bgClass = "bg-gray-50/50 hover:bg-emerald-50 text-gray-700 border border-gray-100/40";
+                          let dotClass = null;
+
+                          if (isSelected) {
+                            bgClass = "bg-emerald-600 text-white font-black scale-105 shadow-sm ring-2 ring-emerald-500/50 z-10";
+                          } else if (isWorking) {
+                            bgClass = "bg-emerald-50 hover:bg-emerald-100/80 text-emerald-950 border border-emerald-200 font-bold";
+                            dotClass = "bg-emerald-500";
+                          } else if (isVacation) {
+                            bgClass = "bg-orange-50 hover:bg-orange-100/80 text-orange-950 border border-orange-200 font-bold";
+                            dotClass = "bg-orange-500";
+                          } else if (hasHoliday) {
+                            bgClass = hasHoliday.type === "public" ? "bg-amber-50 hover:bg-amber-100/60 border border-amber-200 text-amber-900" : "bg-rose-50 hover:bg-rose-100/60 border border-rose-200 text-rose-900";
+                          }
+
+                          return (
+                            <button
+                              key={d.date}
+                              type="button"
+                              onClick={() => setSelectedDate(d.date)}
+                              className={`p-1.5 rounded-xl text-xs flex flex-col items-center justify-between min-h-[44px] cursor-pointer transition-all active:scale-95 ${bgClass}`}
+                              title={hasHoliday ? `${hasHoliday.name} (${hasHoliday.type === 'public' ? 'วันหยุดนักขัตฤกษ์' : 'วันหยุดบริษัท'})` : ""}
+                            >
+                              <span className="text-[10px] font-black">{d.dateNum}</span>
+                              <div className="flex gap-0.5 mt-0.5 items-center justify-center min-h-[8px]">
+                                {isWorking && (
+                                  <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : dotClass || 'bg-emerald-500'}`} />
+                                )}
+                                {(isPhone1 || isPhone2) && (
+                                  <span className="text-[6px] leading-none shrink-0">📞</span>
+                                )}
+                                {isDoc && (
+                                  <span className="text-[6px] leading-none shrink-0">📝</span>
+                                )}
+                                {isVacation && (
+                                  <span className="text-[6px] leading-none shrink-0">🌴</span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Legend */}
+                      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 border-t border-gray-100 pt-2 text-[9px] text-gray-500 font-semibold mt-1">
+                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />ขึ้นเวร (Work)</span>
+                        <span className="flex items-center gap-1"><span>📞 / 📝</span>เวรสายด่วน/เอกสาร</span>
+                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-orange-400" />ลาพักร้อน (Leave)</span>
+                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />วันหยุดประจำแผนก</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* QUICK REQUEST FORM */}
+                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100/50 shadow-sm flex flex-col gap-4 text-left">
+                  <div className="border-b border-gray-100 pb-2">
+                    <h3 className="text-xs sm:text-sm font-bold text-gray-700 flex items-center gap-1.5">
+                      <RefreshCcw className="w-4 h-4 text-emerald-600" />
+                      <span>ยื่นเปลี่ยนเวร/แจ้งลางานด่วน</span>
+                    </h3>
+                  </div>
+
+                  <form onSubmit={handleCreateShiftRequest} className="flex flex-col gap-3 text-left">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">1. ผู้ส่งคำขอ (ฉันคือ...)</label>
+                      <div className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 font-black flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>คุณ{reqRequester}</span>
+                        </span>
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black">ยืนยันตัวตนแล้ว</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">2. ประเภทคำขอ</label>
+                      <div className="grid grid-cols-3 gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200">
+                        <button
+                          type="button"
+                          onClick={() => setReqType("swap")}
+                          className={`py-1 rounded-lg text-center text-xs font-black transition-all cursor-pointer ${
+                            reqType === "swap" ? "bg-emerald-600 text-white shadow-xs" : "text-gray-500 hover:bg-gray-100"
+                          }`}
+                        >
+                          🤝 สลับเวร
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReqType("cover")}
+                          className={`py-1 rounded-lg text-center text-xs font-black transition-all cursor-pointer ${
+                            reqType === "cover" ? "bg-emerald-600 text-white shadow-xs" : "text-gray-500 hover:bg-gray-100"
+                          }`}
+                        >
+                          🙋‍♀️ ขึ้นแทน
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReqType("leave")}
+                          className={`py-1 rounded-lg text-center text-xs font-black transition-all cursor-pointer ${
+                            reqType === "leave" ? "bg-emerald-600 text-white shadow-xs" : "text-gray-500 hover:bg-gray-100"
+                          }`}
+                        >
+                          🌴 ลาพักร้อน
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">3. วันที่แจ้งทำ</label>
+                        <input
+                          type="date"
+                          value={reqDate}
+                          onChange={(e) => setReqDate(e.target.value)}
+                          required
+                          className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-black text-gray-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      {reqType === "swap" && (
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">4. วันสลับคืน</label>
+                          <input
+                            type="date"
+                            value={reqTargetDate}
+                            onChange={(e) => setReqTargetDate(e.target.value)}
+                            required
+                            className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-black text-gray-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {(reqType === "swap" || reqType === "cover") && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                          {reqType === "swap" ? "เลือกคนสลับด้วย" : "เลือกคนที่จะขึ้นเวรแทน"}
+                        </label>
+                        <select
+                          value={reqTargetStaff}
+                          onChange={(e) => setReqTargetStaff(e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-black text-gray-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                        >
+                          {ALL_STAFF.filter(s => s !== reqRequester).map(s => (
+                            <option key={s} value={s}>คุณ{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">หมายเหตุ / เหตุผลเพิ่มเติม</label>
+                      <input
+                        type="text"
+                        placeholder="เช่น ติดธุระครอบครัว, พักผ่อนส่วนตัว"
+                        value={reqNote}
+                        onChange={(e) => setReqNote(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 text-gray-700"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black rounded-xl text-xs cursor-pointer shadow-xs transition-all mt-1"
+                    >
+                      ส่งคำขอไปยังระบบ 🚀
+                    </button>
+                  </form>
+                </div>
+
+                {/* CURRENT ACTIVE REQUESTS */}
+                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100/50 shadow-sm flex flex-col gap-3 text-left">
+                  <div className="border-b border-gray-100 pb-2 flex items-center justify-between">
+                    <h3 className="text-xs sm:text-sm font-bold text-gray-700 flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-emerald-600" />
+                      <span>รายการขอเปลี่ยนเวรล่าสุด</span>
+                    </h3>
+                    <div className="flex items-center gap-1 bg-gray-50 p-0.5 rounded-lg border border-gray-100">
+                      <button
+                        onClick={() => setActiveReqTab("pending")}
+                        type="button"
+                        className={`px-2 py-0.5 rounded text-[9px] font-black cursor-pointer transition-all ${
+                          activeReqTab === "pending" ? "bg-white text-gray-800 shadow-2xs" : "text-gray-400 hover:text-gray-600"
+                        }`}
+                      >
+                        รอนุมัติ ({shiftRequests.filter(r => r.status === "pending").length})
+                      </button>
+                      <button
+                        onClick={() => setActiveReqTab("all")}
+                        type="button"
+                        className={`px-2 py-0.5 rounded text-[9px] font-black cursor-pointer transition-all ${
+                          activeReqTab === "all" ? "bg-white text-gray-800 shadow-2xs" : "text-gray-400 hover:text-gray-600"
+                        }`}
+                      >
+                        ทั้งหมด ({shiftRequests.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 max-h-[290px] overflow-y-auto custom-scrollbar pr-1">
+                    {(() => {
+                      const filtered = activeReqTab === "pending"
+                        ? shiftRequests.filter(r => r.status === "pending")
+                        : shiftRequests;
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="py-8 text-center text-[11px] text-gray-400 italic bg-gray-50/50 rounded-xl border border-dashed border-gray-150">
+                            ไม่มีรายการคำขอในขณะนี้
+                          </div>
+                        );
+                      }
+
+                      return filtered.slice(0, 8).map(req => {
+                        const isPending = req.status === "pending";
+                        const isApproved = req.status === "approved";
+                        const isRejected = req.status === "rejected";
+                        const formattedReqDate = new Date(req.date).toLocaleDateString("th-TH", { day: 'numeric', month: 'short' });
+                        const formattedTargetDate = req.targetDate ? new Date(req.targetDate).toLocaleDateString("th-TH", { day: 'numeric', month: 'short' }) : "";
+
+                        return (
+                          <div
+                            key={req.id}
+                            className={`p-3 rounded-xl border transition-all text-left flex flex-col gap-1.5 ${
+                              isApproved
+                                ? "bg-emerald-50/20 border-emerald-100"
+                                : isRejected
+                                ? "bg-red-50/10 border-red-100/50"
+                                : "bg-gray-50/50 border-gray-200"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                                req.type === "swap" ? "bg-indigo-100 text-indigo-800" : req.type === "cover" ? "bg-sky-100 text-sky-800" : "bg-orange-100 text-orange-800"
+                              }`}>
+                                {req.type === "swap" ? "🤝 สลับเวร" : req.type === "cover" ? "🙋‍♀️ ขึ้นแทน" : "🌴 ลาพักร้อน"}
+                              </span>
+                              
+                              <span className={`text-[8.5px] font-black px-1.5 py-0.5 rounded-md ${
+                                isApproved ? "bg-emerald-100 text-emerald-800" : isRejected ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800 animate-pulse"
+                              }`}>
+                                {isApproved ? "อนุมัติสำเร็จ" : isRejected ? "ปฏิเสธ" : "รอการตรวจ"}
+                              </span>
+                            </div>
+
+                            <div className="text-[11px] font-semibold text-gray-700 leading-normal">
+                              {req.type === "swap" ? (
+                                <span>คุณ <strong>{req.requester}</strong> ({formattedReqDate}) สลับกับ คุณ <strong>{req.targetStaff}</strong> ({formattedTargetDate})</span>
+                              ) : req.type === "cover" ? (
+                                <span>คุณ <strong>{req.requester}</strong> ขอให้ คุณ <strong>{req.targetStaff}</strong> ขึ้นเวรแทน ({formattedReqDate})</span>
+                              ) : (
+                                <span>คุณ <strong>{req.requester}</strong> ขอลาพักร้อน ({formattedReqDate})</span>
+                              )}
+                              
+                              {req.note && (
+                                <span className="block text-[10px] text-gray-400 mt-0.5 italic font-normal">💬 บันทึก: "{req.note}"</span>
+                              )}
+                            </div>
+
+                            {isPending && (
+                              <div className="flex gap-1 justify-end mt-1 border-t border-gray-200/40 pt-2">
+                                {req.targetStaff === currentUser ? (
+                                  <button
+                                    onClick={() => {
+                                      setIsAdmin(true);
+                                      handleApproveShiftRequest(req);
+                                      setIsAdmin(false);
+                                    }}
+                                    type="button"
+                                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black cursor-pointer active:scale-95 animate-pulse"
+                                  >
+                                    🤝 ตอบตกลงคำขอสลับเวร
+                                  </button>
+                                ) : isAdmin ? (
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => handleRejectShiftRequest(req.id, req.requester, req.date)}
+                                      type="button"
+                                      className="px-2 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                                    >
+                                      ปฏิเสธ
+                                    </button>
+                                    <button
+                                      onClick={() => handleApproveShiftRequest(req)}
+                                      type="button"
+                                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black transition-all cursor-pointer"
+                                    >
+                                      อนุมัติข้อตกลง
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setIsAdmin(true);
+                                      handleApproveShiftRequest(req);
+                                    }}
+                                    type="button"
+                                    className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[9px] font-black transition-all cursor-pointer"
+                                  >
+                                    จำลองกดยอมรับคำขอ (Simulate)
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* HOLIDAYS OF THE MONTH */}
+                {(() => {
+                  const monthlyHolidays = datesInMonth.filter(d => d.holiday);
+                  return (
+                    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100/50 shadow-sm flex flex-col gap-3 text-left">
+                      <h3 className="text-xs sm:text-sm font-bold text-gray-700 flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                        <CalendarRange className="w-4 h-4 text-emerald-600" />
+                        <span>วันหยุดนักขัตฤกษ์และวันหยุดแผนกเดือนนี้</span>
+                      </h3>
+                      
+                      {monthlyHolidays.length === 0 ? (
+                        <div className="py-3 text-center text-xs text-gray-400 italic">ไม่มีวันหยุดประจำเดือนนี้</div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {monthlyHolidays.map(d => {
+                            const h = d.holiday!;
+                            return (
+                              <div
+                                key={d.date}
+                                className={`p-2.5 rounded-xl border flex flex-col gap-0.5 text-left ${
+                                  h.type === "public" ? "bg-amber-50/40 border-amber-100 text-amber-900" : "bg-rose-50/40 border-rose-100 text-rose-900"
+                                }`}
+                              >
+                                <span className="text-[8px] font-black uppercase opacity-75">วันที่ {d.dateNum} ({d.dayName})</span>
+                                <span className="text-xs font-black truncate">{h.name}</span>
+                                <span className="text-[8px] font-medium opacity-85">{h.type === "public" ? "วันหยุดนักขัตฤกษ์" : "วันหยุดพิเศษของบริษัท"}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+              </div>
+
+            </div>
+          </div>
+        ) : (
+          /* ======================================================= */
+          /*   2. ORIGINAL ADMIN CONSOLE                             */
+          /* ======================================================= */
+          <>
+            {/* Toggle View Mode for Mobile vs Desktop */}
+            <div className="flex bg-white/90 backdrop-blur border border-emerald-100/50 p-1 rounded-2xl shadow-sm gap-1 w-full max-w-lg mx-auto">
           <button
             onClick={() => setViewMode("daily")}
             className={`flex-1 flex items-center justify-center gap-2 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
@@ -1906,13 +3014,19 @@ export default function App() {
                           </div>
                         </div>
                         <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
-                          {["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."].map((dayName, idx) => (
-                            <div key={dayName} className={`text-center font-bold text-[10px] sm:text-xs py-1.5 rounded-lg ${
-                              idx === 0 || idx === 6 ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-600'
-                            }`}>
-                              {dayName}
-                            </div>
-                          ))}
+                          {["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."].map((dayName, idx) => {
+                            let dayBg = "bg-gray-50 text-gray-600";
+                            if (idx === 0) { // Sunday
+                              dayBg = "bg-red-50 text-red-600";
+                            } else if (idx === 6) { // Saturday
+                              dayBg = "bg-purple-50 text-purple-600";
+                            }
+                            return (
+                              <div key={dayName} className={`text-center font-bold text-[10px] sm:text-xs py-1.5 rounded-lg ${dayBg}`}>
+                                {dayName}
+                              </div>
+                            );
+                          })}
                         </div>
 
                         <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
@@ -1933,6 +3047,8 @@ export default function App() {
                             let statusLabel = "วันหยุด";
                             let statusColor = "text-gray-400";
 
+                            const hasHoliday = cell.holiday;
+
                             if (isVacation) {
                               bgClass = "bg-orange-50/60 border-orange-200 text-orange-950 hover:bg-orange-100/60 hover:border-orange-300";
                               statusLabel = "พักร้อน 🌴";
@@ -1949,6 +3065,16 @@ export default function App() {
                               }
                               statusLabel = roleText;
                               statusColor = "text-emerald-700";
+                            } else if (hasHoliday) {
+                              if (hasHoliday.type === "public") {
+                                bgClass = "bg-amber-50/60 border-amber-200 text-amber-950 hover:bg-amber-100/50 hover:border-amber-300";
+                                statusLabel = "วันหยุดนักขัตฤกษ์ 🎉";
+                                statusColor = "text-amber-700 font-bold";
+                              } else {
+                                bgClass = "bg-rose-50/50 border-rose-200 text-rose-950 hover:bg-rose-100/50 hover:border-rose-300";
+                                statusLabel = "วันหยุดบริษัท 🏢";
+                                statusColor = "text-rose-700 font-bold";
+                              }
                             }
 
                             const workingG2Count = dayData ? dayData.workingStaff.filter(s => GROUP_2.includes(s)).length : 0;
@@ -1984,6 +3110,15 @@ export default function App() {
                                   <span className={`text-[9px] sm:text-[10px] truncate max-w-full ${statusColor}`}>
                                     {statusLabel}
                                   </span>
+                                  {hasHoliday && (
+                                    <span className={`text-[8px] font-extrabold px-1 py-0.5 rounded-sm leading-tight max-w-full truncate block mt-0.5 ${
+                                      hasHoliday.type === "public"
+                                        ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                        : "bg-rose-100 text-rose-800 border border-rose-200"
+                                    }`} title={hasHoliday.name}>
+                                      {hasHoliday.name}
+                                    </span>
+                                  )}
                                   
                                   {isWorking && (
                                     <div className="flex flex-wrap gap-0.5 mt-0.5">
@@ -2203,20 +3338,36 @@ export default function App() {
                 <div className="flex gap-2 overflow-x-auto py-1 custom-scrollbar w-full pb-2 scroll-smooth">
                   {datesInMonth.map((d) => {
                     const isSelected = selectedDate === d.date;
+                    const hasHoliday = d.holiday;
+                    let tapeClass = "";
+                    if (isSelected) {
+                      tapeClass = "bg-emerald-600 text-white shadow-md font-bold scale-105";
+                    } else if (hasHoliday) {
+                      if (hasHoliday.type === "public") {
+                        tapeClass = "bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-200";
+                      } else {
+                        tapeClass = "bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200";
+                      }
+                    } else if (d.isWeekend) {
+                      tapeClass = "bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800 border border-emerald-100/60";
+                    } else {
+                      tapeClass = "bg-gray-50 hover:bg-emerald-50 text-gray-700 border border-gray-100";
+                    }
+
                     return (
                       <button
                         key={d.date}
                         onClick={() => setSelectedDate(d.date)}
-                        className={`flex flex-col items-center justify-center p-2.5 rounded-xl min-w-[58px] transition-all shrink-0 ${
-                          isSelected
-                            ? "bg-emerald-600 text-white shadow-md font-bold scale-105"
-                            : d.isWeekend
-                            ? "bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800 border border-emerald-100/60"
-                            : "bg-gray-50 hover:bg-emerald-50 text-gray-700 border border-gray-100"
-                        }`}
+                        className={`flex flex-col items-center justify-center p-2.5 rounded-xl min-w-[58px] transition-all shrink-0 cursor-pointer ${tapeClass}`}
+                        title={hasHoliday ? `${hasHoliday.name} (${hasHoliday.type === 'public' ? 'วันหยุดนักขัตฤกษ์' : 'วันหยุดบริษัท'})` : ""}
                       >
                         <span className="text-[9px] uppercase tracking-wider font-bold opacity-85">{d.dayName}</span>
-                        <span className="text-base font-black mt-0.5">{d.dateNum}</span>
+                        <span className="text-base font-black mt-0.5 relative">
+                          {d.dateNum}
+                          {hasHoliday && (
+                            <span className={`absolute -top-1 -right-1 text-[8px] ${hasHoliday.type === 'public' ? 'text-amber-500' : 'text-rose-500'}`}>⭐</span>
+                          )}
+                        </span>
                       </button>
                     );
                   })}
@@ -2521,16 +3672,37 @@ export default function App() {
                     const workingG2Count = dayData ? dayData.workingStaff.filter(s => GROUP_2.includes(s)).length : 0;
                     const offG2Count = 9 - workingG2Count;
                     const isExcessiveOff = offG2Count > 4;
+                    const hasHoliday = d.holiday;
+                    const dayOfWeek = d.obj.getDay();
+
+                    let headerBg = d.isWeekend ? "bg-emerald-700 text-white" : "bg-emerald-600 text-white";
+                    if (dayOfWeek === 6) {
+                      headerBg = "bg-purple-600 text-white"; // Saturday Purple
+                    } else if (dayOfWeek === 0) {
+                      headerBg = "bg-red-600 text-white"; // Sunday Red
+                    }
+
+                    if (hasHoliday) {
+                      if (hasHoliday.type === "public") {
+                        headerBg = "bg-amber-500 text-white";
+                      } else {
+                        headerBg = "bg-rose-500 text-white";
+                      }
+                    }
+
+                    let headerTitle = "";
+                    if (hasHoliday) {
+                      headerTitle += `[วันหยุด: ${hasHoliday.name} (${hasHoliday.type === "public" ? "นักขัตฤกษ์" : "บริษัท"})] `;
+                    }
+                    if (isExcessiveOff) {
+                      headerTitle += `เตือนภัย: วันนี้มีทีมหยุดเกิน 4 คน! (หยุด ${offG2Count} คน จาก 9 คน)`;
+                    }
 
                     return (
                       <th
                         key={d.date}
-                        className={`p-1 sm:p-[3px] md:p-2 min-w-[40px] sm:min-w-[44px] lg:min-w-[48px] border-l border-emerald-500/20 text-center relative sticky top-0 z-30 ${
-                          d.isWeekend
-                            ? "bg-emerald-700 text-white"
-                            : "bg-emerald-600 text-white"
-                        } ${isExcessiveOff ? "ring-2 ring-red-500 ring-inset" : ""}`}
-                        title={isExcessiveOff ? `เตือนภัย: วันนี้มีทีมหยุดเกิน 4 คน! (หยุด ${offG2Count} คน จาก 9 คน)` : ""}
+                        className={`p-1 sm:p-[3px] md:p-2 min-w-[40px] sm:min-w-[44px] lg:min-w-[48px] border-l border-emerald-500/20 text-center relative sticky top-0 z-30 ${headerBg} ${isExcessiveOff ? "ring-2 ring-red-500 ring-inset" : ""}`}
+                        title={headerTitle || undefined}
                       >
                         <div className="text-[8px] sm:text-[10px] opacity-90 tracking-[0.05em] sm:tracking-widest uppercase">
                           {d.dayName}
@@ -2541,6 +3713,12 @@ export default function App() {
                             <span className="absolute -top-1 -right-2 text-red-500 text-[9px] font-bold animate-pulse" title="หยุดเกิน 4 คน!">
                               ⚠️
                             </span>
+                          )}
+                          {hasHoliday && (
+                            <span
+                              className="absolute bottom-[-2px] left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white animate-pulse"
+                              title={hasHoliday.name}
+                            />
                           )}
                         </div>
                       </th>
@@ -2597,16 +3775,28 @@ export default function App() {
                           const isPhone3551 = dayData?.phone3551 === staff;
                           const isPhone3552 = dayData?.phone3552 === staff;
                           const fireCode = dayData?.fireCodes[staff];
+
+                          // Background column indicator highlights
+                          let cellBg = "";
+                          if (d.holiday) {
+                            cellBg = d.holiday.type === "public" ? "bg-amber-50/50" : "bg-rose-50/40";
+                          } else if (d.obj.getDay() === 6) { // Sat
+                            cellBg = "bg-purple-50/15";
+                          } else if (d.obj.getDay() === 0) { // Sun
+                            cellBg = "bg-red-50/15";
+                          } else if (d.isWeekend) {
+                            cellBg = "bg-gray-50/50";
+                          }
+
                           return (
                             <td
                               key={d.date}
                               onClick={() => toggleCellState(d.date, staff)}
-                              className={`p-0.5 sm:p-1 border-b border-l border-emerald-100 text-center relative cursor-pointer transition-colors ${
+                              title={d.holiday ? `${d.holiday.name} (${d.holiday.type === 'public' ? 'วันหยุดนักขัตฤกษ์' : 'วันหยุดบริษัท'})` : undefined}
+                              className={`p-0.5 sm:p-1 border-b border-l border-emerald-100 text-center relative cursor-pointer transition-colors ${cellBg} ${
                                 isAdmin
                                   ? "hover:bg-emerald-100/50"
                                   : "hover:bg-amber-100/40"
-                              } ${
-                                d.isWeekend ? "bg-gray-50/50" : ""
                               }`}
                             >
                               {isVacation ? (
@@ -2722,9 +3912,25 @@ export default function App() {
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
              {datesInMonth.map((d: any) => {
                 const day = schedule[d.date];
+                const hasHoliday = d.holiday;
+                let borderBg = "bg-gray-50 border-gray-100 hover:bg-white";
+                if (hasHoliday) {
+                  if (hasHoliday.type === "public") {
+                    borderBg = "bg-amber-50/50 border-amber-200 hover:bg-amber-50";
+                  } else {
+                    borderBg = "bg-rose-50/40 border-rose-200 hover:bg-rose-50/60";
+                  }
+                }
                 return (
-                  <div key={d.date} className="bg-gray-50 border border-gray-100 rounded-lg p-2.5 flex flex-col hover:bg-white transition-colors hover:shadow-[0_4px_10px_rgba(0,0,0,0.05)] cursor-default">
-                    <span className="text-xs font-semibold text-gray-600 mb-2 border-b border-gray-200 pb-1.5">วันที่ {d.dateNum}</span>
+                  <div key={d.date} className={`border rounded-lg p-2.5 flex flex-col transition-colors hover:shadow-[0_4px_10px_rgba(0,0,0,0.05)] cursor-default ${borderBg}`}>
+                    <div className="flex items-center justify-between mb-2 border-b border-gray-200/60 pb-1.5">
+                      <span className="text-xs font-semibold text-gray-600">วันที่ {d.dateNum}</span>
+                      {hasHoliday && (
+                        <span className={`text-[8.5px] font-black px-1 py-[1px] rounded-md leading-none truncate max-w-[65px] ${hasHoliday.type === 'public' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-rose-100 text-rose-800 border border-rose-200'}`} title={hasHoliday.name}>
+                          {hasHoliday.name}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[10px] sm:text-xs text-gray-700 flex flex-col gap-1.5">
                       <div className="flex items-center bg-sky-50/50 rounded p-1">
                         <PhoneCall className="w-3 h-3 text-sky-600 mr-1.5 shrink-0"/> 
@@ -2740,6 +3946,155 @@ export default function App() {
                   </div>
                 )
              })}
+          </div>
+        </section>
+
+        {/* 📅 จัดการวันหยุดนักขัตฤกษ์และวันหยุดบริษัท (Holiday Management) */}
+        <section className="bg-white rounded-2xl shadow-sm border border-rose-100 p-4 sm:p-5 shrink-0 mb-6 mx-auto w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-50 pb-3 mb-4">
+            <h2 className="text-base sm:text-lg font-bold text-rose-800 flex items-center">
+               <CalendarRange className="w-5 h-5 mr-1.5 sm:mr-2 text-rose-600 shrink-0" />
+               <span>ตารางวันหยุดนักขัตฤกษ์และวันหยุดบริษัท ({currentMonthStr})</span>
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-1 rounded-lg">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>วันหยุดนักขัตฤกษ์ (สีส้ม)</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200 px-2 py-1 rounded-lg">
+                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                <span>วันหยุดบริษัท (สีแดงอ่อน)</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* ฝั่งซ้าย: รายการวันหยุดของเดือนนี้ */}
+            <div className="lg:col-span-7 flex flex-col gap-3">
+              <h3 className="text-xs sm:text-sm font-bold text-gray-700">รายการวันหยุดประจำรอบเดือนนี้:</h3>
+              {datesInMonth.filter(d => d.holiday).length === 0 ? (
+                <div className="text-center py-8 bg-gray-50/50 border border-dashed border-gray-200 rounded-xl">
+                  <span className="text-gray-400 text-xs sm:text-sm italic">ไม่มีวันหยุดในรอบเดือนนี้</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {datesInMonth.filter(d => d.holiday).map(d => {
+                    const h = d.holiday!;
+                    return (
+                      <div
+                        key={h.date}
+                        className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                          h.type === "public"
+                            ? "bg-amber-50/60 border-amber-100 text-amber-900"
+                            : "bg-rose-50/40 border-rose-100 text-rose-900"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[10px] uppercase font-bold tracking-wider opacity-75 block">
+                            วันที่ {d.dateNum} ({d.dayName})
+                          </span>
+                          <span className="text-xs sm:text-sm font-black truncate block mt-0.5">
+                            {h.name}
+                          </span>
+                          <span className="text-[9px] font-medium opacity-80 block mt-0.5">
+                            {h.type === "public" ? "วันหยุดนักขัตฤกษ์" : "วันหยุดของบริษัท"}
+                          </span>
+                        </div>
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              setHolidays(prev => prev.filter(item => item.date !== h.date));
+                              showToast(`ลบวันหยุด "${h.name}" เรียบร้อยแล้ว`, false, new Date().toLocaleDateString("th-TH"));
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg transition-colors cursor-pointer ml-2 shrink-0"
+                            title="ลบวันหยุด"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ฝั่งขวา: ฟอร์มเพิ่มวันหยุด (เฉพาะแอดมิน) */}
+            <div className="lg:col-span-5 bg-gray-50/50 border border-gray-100 rounded-2xl p-4 flex flex-col justify-between">
+              <div>
+                <h3 className="text-xs sm:text-sm font-bold text-gray-700 mb-2.5 flex items-center gap-1">
+                  <span>➕ เพิ่มวันหยุดใหม่</span>
+                  {!isAdmin && <span className="text-[10px] text-amber-600 font-normal">(เฉพาะ Admin เท่านั้น)</span>}
+                </h3>
+
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">วันที่ต้องการหยุด</label>
+                    <input
+                      type="date"
+                      disabled={!isAdmin}
+                      value={newHolidayDate}
+                      onChange={(e) => setNewHolidayDate(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">ชื่อวันหยุด / รายละเอียด</label>
+                    <input
+                      type="text"
+                      disabled={!isAdmin}
+                      placeholder="เช่น วันขึ้นปีใหม่, วันหยุดประจำปีบริษัท"
+                      value={newHolidayName}
+                      onChange={(e) => setNewHolidayName(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">ประเภทวันหยุด</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={!isAdmin}
+                        onClick={() => setNewHolidayType("public")}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
+                          newHolidayType === "public"
+                            ? "bg-amber-100 border-amber-300 text-amber-800 shadow-sm"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        } disabled:opacity-50`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span>นักขัตฤกษ์</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!isAdmin}
+                        onClick={() => setNewHolidayType("company")}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
+                          newHolidayType === "company"
+                            ? "bg-rose-100 border-rose-300 text-rose-800 shadow-sm"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        } disabled:opacity-50`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                        <span>วันหยุดบริษัท</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={!isAdmin || !newHolidayDate || !newHolidayName.trim()}
+                onClick={handleAddHoliday}
+                className="w-full mt-4 flex items-center justify-center gap-1.5 text-xs font-black bg-rose-600 hover:bg-rose-700 active:bg-rose-800 disabled:opacity-40 text-white py-2.5 rounded-xl transition-all shadow-xs cursor-pointer select-none"
+              >
+                <CalendarPlus className="w-4 h-4" />
+                <span>บันทึกวันหยุดใหม่</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -3153,6 +4508,8 @@ export default function App() {
             </div>
           </div>
         </section>
+          </>
+        )}
       </main>
 
       {/* Admin / User Login Modal */}
@@ -3227,7 +4584,9 @@ export default function App() {
                   if (loginTab === "staff") {
                     if (passwordInput === "1234") {
                       setCurrentUser(selectedLoginStaff);
+                      setSelectedStaffFilter(selectedLoginStaff);
                       setIsAdmin(false);
+                      setIsAdminConsoleOpen(false);
                       setShowAdminModal(false);
                       setPasswordInput("");
                       setPasswordError("");
@@ -3238,6 +4597,7 @@ export default function App() {
                   } else {
                     if (passwordInput === "1234" || passwordInput.toLowerCase() === "admin") {
                       setIsAdmin(true);
+                      setIsAdminConsoleOpen(true);
                       setCurrentUser(null);
                       setShowAdminModal(false);
                       setPasswordInput("");
